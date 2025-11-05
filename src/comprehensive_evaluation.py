@@ -20,6 +20,10 @@ from sklearn.metrics import confusion_matrix, classification_report, accuracy_sc
 from sklearn.dummy import DummyClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.svm import SVC
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.naive_bayes import MultinomialNB
+from catboost import CatBoostClassifier
 import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
@@ -137,10 +141,12 @@ class ComprehensiveEvaluator:
         for name, model in baselines.items():
             console.print(f"Benchmarking {model.name}...")
             start_time = time.perf_counter()
-            if name == "tfidf_svm":
+            if name.startswith("tfidf_"):
+                # All TF-IDF based models
                 model.fit(X_train_val_vec, self.y_train_val)
                 preds = model.predict(X_test_vec)
             else:
+                # Rule-based and dummy classifiers
                 preds = model.predict(X_test.reshape(-1, 1))
             latency = time.perf_counter() - start_time
             avg_latency = (latency / len(X_test)) if len(X_test) > 0 else 0
@@ -150,18 +156,22 @@ class ComprehensiveEvaluator:
         return all_performances
         
     def _calculate_performance_metrics(self, model_name, y_true, y_pred, latencies, queries=None) -> Dict:
-        report = classification_report(y_true, y_pred, output_dict=True, zero_division=0)
+        # Ensure y_pred is flattened and converted to list (handle numpy arrays)
+        y_pred_flat = np.array(y_pred).flatten().tolist()
+        y_true_flat = np.array(y_true).flatten().tolist()
+        
+        report = classification_report(y_true_flat, y_pred_flat, output_dict=True, zero_division=0)
         routing_decisions = None
         if queries is not None:
              routing_decisions = [{
                 "query": q, "true_category": gt, "predicted_category": p,
                 "correct": gt == p
-            } for q, gt, p in zip(queries, y_true, y_pred)]
+            } for q, gt, p in zip(queries, y_true_flat, y_pred_flat)]
         return {
-            "accuracy": accuracy_score(y_true, y_pred),
+            "accuracy": accuracy_score(y_true_flat, y_pred_flat),
             "classification_report": report,
-            "confusion_matrix": confusion_matrix(y_true, y_pred).tolist(),
-            "labels": sorted(list(set(y_true) | set(y_pred))),
+            "confusion_matrix": confusion_matrix(y_true_flat, y_pred_flat).tolist(),
+            "labels": sorted(list(set(y_true_flat) | set(y_pred_flat))),
             "avg_latency_ms": np.mean(latencies) * 1000,
             "throughput_qps": 1 / np.mean(latencies) if np.mean(latencies) > 0 else float('inf'),
             "routing_decisions": routing_decisions
@@ -175,8 +185,30 @@ class ComprehensiveEvaluator:
                 return np.array([self._predict_single(q) for q in queries])
             def _predict_single(self, query):
                 query_lower = query.lower()
-                if any(word in query_lower for word in ['code', 'function', 'algorithm', 'program', 'script']): return 'coding'
-                elif any(word in query_lower for word in ['calculate', 'solve', 'equation', 'math', 'derivative']): return 'math'
+                coding_keywords = [
+                    'code', 'function', 'algorithm', 'program', 'script', 'debug', 'compile',
+                    'class', 'method', 'variable', 'array', 'loop', 'syntax', 'api', 'library',
+                    'framework', 'database', 'query', 'sql', 'python', 'java', 'javascript',
+                    'implement', 'execute', 'runtime', 'exception', 'bug', 'test', 'git',
+                    'repository', 'commit', 'branch', 'merge', 'deploy', 'docker', 'kubernetes',
+                    'recursion', 'iteration', 'binary', 'search', 'sort', 'hash', 'tree', 'graph',
+                    'stack', 'queue', 'linked list', 'pointer', 'memory', 'optimization',
+                    'complexity', 'big o', 'refactor', 'inheritance', 'polymorphism', 'encapsulation'
+                ]
+                math_keywords = [
+                    'calculate', 'solve', 'equation', 'math', 'derivative', 'integral', 'calculus',
+                    'algebra', 'geometry', 'trigonometry', 'probability', 'statistics', 'theorem',
+                    'proof', 'formula', 'polynomial', 'exponential', 'logarithm', 'matrix',
+                    'vector', 'scalar', 'coefficient', 'variable', 'constant', 'factor',
+                    'multiply', 'divide', 'sum', 'difference', 'quotient', 'remainder',
+                    'prime', 'composite', 'fraction', 'decimal', 'percentage', 'ratio',
+                    'proportion', 'inequality', 'limit', 'series', 'sequence', 'convergence',
+                    'divergence', 'eigenvalue', 'determinant', 'slope', 'tangent', 'cosine',
+                    'sine', 'angle', 'radius', 'diameter', 'circumference', 'area', 'volume',
+                    'perimeter', 'pythagorean', 'quadratic', 'cubic', 'linear'
+                ]
+                if any(word in query_lower for word in coding_keywords): return 'coding'
+                elif any(word in query_lower for word in math_keywords): return 'math'
                 else: return 'general_knowledge'
         dummy_random = DummyClassifier(strategy="uniform", random_state=42)
         dummy_random.fit(X_data.reshape(-1, 1), y_data)
@@ -184,14 +216,56 @@ class ComprehensiveEvaluator:
         dummy_freq = DummyClassifier(strategy="most_frequent", random_state=42)
         dummy_freq.fit(X_data.reshape(-1, 1), y_data)
         dummy_freq.name = "Most Frequent Class"
+        
+        # TF-IDF + Various Classifiers
         svm_classifier = SVC(kernel='rbf', random_state=42)
         svm_classifier.name = "TF-IDF + SVM"
-        return {"random": dummy_random, "most_frequent": dummy_freq, "rule_based": RuleBasedPredictor(), "tfidf_svm": svm_classifier}
+        
+        logistic_classifier = LogisticRegression(max_iter=1000, random_state=42)
+        logistic_classifier.name = "TF-IDF + Logistic Regression"
+        
+        rf_classifier = RandomForestClassifier(n_estimators=100, random_state=42)
+        rf_classifier.name = "TF-IDF + Random Forest"
+        
+        nb_classifier = MultinomialNB()
+        nb_classifier.name = "TF-IDF + Naive Bayes"
+        
+        # CatBoost Classifier (handles text features directly)
+        catboost_classifier = CatBoostClassifier(
+            iterations=100,
+            learning_rate=0.1,
+            depth=6,
+            random_state=42,
+            verbose=False,
+            allow_writing_files=False
+        )
+        catboost_classifier.name = "TF-IDF + CatBoost"
+        
+        return {
+            "random": dummy_random, 
+            "most_frequent": dummy_freq, 
+            "rule_based": RuleBasedPredictor(), 
+            "tfidf_svm": svm_classifier,
+            "tfidf_logistic": logistic_classifier,
+            "tfidf_rf": rf_classifier,
+            "tfidf_nb": nb_classifier,
+            "tfidf_catboost": catboost_classifier
+        }
 
     def _cross_validation_with_baselines(self, X, y) -> Tuple[Dict, Dict]:
         k_folds = 5
         kf = KFold(n_splits=k_folds, shuffle=True, random_state=42)
-        ss_ger_fold_accuracies, baseline_fold_scores = [], { "Random Classifier": [], "Most Frequent Class": [], "Rule-based Keywords": [], "TF-IDF + SVM": [] }
+        ss_ger_fold_accuracies = []
+        baseline_fold_scores = {
+            "Random Classifier": [],
+            "Most Frequent Class": [],
+            "Rule-based Keywords": [],
+            "TF-IDF + SVM": [],
+            "TF-IDF + Logistic Regression": [],
+            "TF-IDF + Random Forest": [],
+            "TF-IDF + Naive Bayes": [],
+            "TF-IDF + CatBoost": []
+        }
         vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
         for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
             console.print(f"Running Cross-Validation Fold {fold+1}/{k_folds}...")
@@ -209,10 +283,12 @@ class ComprehensiveEvaluator:
             X_train_vec = vectorizer.fit_transform(X_train)
             X_val_vec = vectorizer.transform(X_val)
             for name, model in baselines.items():
-                if name == "tfidf_svm":
+                if name.startswith("tfidf_"):
+                    # All TF-IDF based models
                     model.fit(X_train_vec, y_train)
                     preds = model.predict(X_val_vec)
                 else:
+                    # Rule-based and dummy classifiers
                     preds = model.predict(X_val.reshape(-1, 1))
                 baseline_fold_scores[model.name].append(accuracy_score(y_val, preds))
         return {"fold_accuracies": ss_ger_fold_accuracies}, baseline_fold_scores
@@ -242,8 +318,15 @@ class ComprehensiveEvaluator:
     # MODIFIED: This function now orchestrates the analysis for multiple models
     def _analyze_token_length_for_all_models(self, all_performances: Dict[str, Any]) -> Dict[str, Any]:
         all_token_analyses = {}
-        # Define which models are relevant for this analysis
-        relevant_models = ["Semantic Router", "TF-IDF + SVM", "Rule-based Keywords"]
+        # Define which models are relevant for this analysis (top performers + semantic router)
+        relevant_models = [
+            "Semantic Router", 
+            "TF-IDF + SVM", 
+            "TF-IDF + Logistic Regression",
+            "TF-IDF + Random Forest",
+            "TF-IDF + CatBoost",
+            "Rule-based Keywords"
+        ]
         for model_name, performance_data in all_performances.items():
             if model_name in relevant_models:
                 console.print(f"Analyzing token length impact for {model_name}...")
@@ -262,11 +345,15 @@ class ComprehensiveEvaluator:
 
         # Professional color palette (consistent with academic style)
         color_map = {
-            'Semantic Router': '#8B4789',      # Purple
-            'Random Classifier': '#5B9BD5',    # Blue
-            'Most Frequent Class': '#70AD47',  # Green
-            'Rule-based Keywords': '#FFC000',  # Gold
-            'TF-IDF + SVM': '#C55A11'         # Orange
+            'Semantic Router': '#8B4789',           # Purple
+            'Random Classifier': '#5B9BD5',         # Blue
+            'Most Frequent Class': '#70AD47',       # Green
+            'Rule-based Keywords': '#FFC000',       # Gold
+            'TF-IDF + SVM': '#C55A11',             # Orange
+            'TF-IDF + Logistic Regression': '#E74C3C',  # Red
+            'TF-IDF + Random Forest': '#16A085',    # Teal
+            'TF-IDF + Naive Bayes': '#9B59B6',     # Light Purple
+            'TF-IDF + CatBoost': '#E67E22'         # Dark Orange
         }
         
         # Figure 1a: Accuracy Comparison (Separate PNG)
@@ -366,6 +453,10 @@ class ComprehensiveEvaluator:
                 'Semantic Router': '#8B4789',
                 'Rule-based Keywords': '#FFC000',
                 'TF-IDF + SVM': '#C55A11',
+                'TF-IDF + Logistic Regression': '#E74C3C',
+                'TF-IDF + Random Forest': '#16A085',
+                'TF-IDF + Naive Bayes': '#9B59B6',
+                'TF-IDF + CatBoost': '#E67E22',
                 'Random Classifier': '#5B9BD5',
                 'Most Frequent Class': '#70AD47'
             }
@@ -375,14 +466,22 @@ class ComprehensiveEvaluator:
                 'Semantic Router': 'o',
                 'Rule-based Keywords': 's',
                 'TF-IDF + SVM': '^',
-                'Random Classifier': 'D',
-                'Most Frequent Class': 'v'
+                'TF-IDF + Logistic Regression': 'D',
+                'TF-IDF + Random Forest': 'v',
+                'TF-IDF + Naive Bayes': 'p',
+                'TF-IDF + CatBoost': '*',
+                'Random Classifier': 'h',
+                'Most Frequent Class': 'X'
             }
             
             linestyle_map = {
                 'Semantic Router': '-',
                 'Rule-based Keywords': '--',
                 'TF-IDF + SVM': '-',
+                'TF-IDF + Logistic Regression': '-.',
+                'TF-IDF + Random Forest': ':',
+                'TF-IDF + Naive Bayes': '--',
+                'TF-IDF + CatBoost': '-',
                 'Random Classifier': ':',
                 'Most Frequent Class': '-.'
             }
