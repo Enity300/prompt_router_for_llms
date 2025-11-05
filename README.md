@@ -39,12 +39,11 @@ This project implements an intelligent routing system that classifies user queri
 ## ✨ Features
 
 - 🔍 **Semantic Classification**: Uses `all-MiniLM-L6-v2` sentence transformer for query embedding
-- 📊 **18K Sample Database**: Balanced dataset across coding, math, and general knowledge
+- 📊 **Variable Sample Database**: Balanced dataset across coding, math, and general knowledge that can be increased depending on user
 - 🎯 **5 Dataset Integration**: Combines KodCode, GSM8K, TriviaQA, and LLM-routing datasets
 - 🧠 **Memory Efficient**: Sequential processing prevents memory overload
 - 📈 **Comprehensive Evaluation**: Accuracy, latency, confusion matrices, and visualization
 - 🔄 **Local & Cloud Models**: Supports both Ollama local models and cloud APIs
-- 🎨 **Visual Analytics**: Interactive embeddings visualization with PCA and t-SNE
 
 ---
 
@@ -89,7 +88,7 @@ This project implements an intelligent routing system that classifies user queri
    - General: `llama3.2:1b`
 
 4. **Evaluation System** (`src/comprehensive_evaluation.py`)
-   - Tests on 6,000 unseen samples
+   - Tests on variable unseen samples (user can also define the number of test samples, similar to variable sample database)
    - Generates performance metrics
    - Creates visualization charts
 
@@ -103,32 +102,13 @@ This project implements an intelligent routing system that classifies user queri
 - Git
 - Ollama (for local models) - [Install Ollama](https://ollama.ai/)
 
-### Step 1: Clone the Repository
-
-```bash
-git clone https://github.com/Enity300/prompt_router_for_llms.git
-cd prompt_router_for_llms
-```
-
-### Step 2: Create Virtual Environment
-
-```bash
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# Linux/Mac
-python3 -m venv venv
-source venv/bin/activate
-```
-
-### Step 3: Install Dependencies
+### Step 1: Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### Step 4: Pull Ollama Models (Optional - for local inference)
+### Step 2: Pull Ollama Models (Optional - for local inference)
 
 ```bash
 ollama pull deepseek-coder:1.3b
@@ -137,7 +117,7 @@ ollama pull llama3.2:1b
 ollama pull phi3:mini
 ```
 
-### Step 5: Configure Environment (Optional)
+### Step 3: Configure Environment (Optional)
 
 Create a `.env` file for custom configuration:
 
@@ -156,7 +136,7 @@ cp .env.example .env
 
 ### 1️⃣ Build the Expertise Database
 
-This creates the vector database with 18,000 embeddings:
+This creates the vector database with variable embeddings:
 
 ```bash
 python src/build_expertise_db.py
@@ -165,16 +145,6 @@ python src/build_expertise_db.py
 **Expected Output:**
 - ChromaDB at `./data/db/`
 - Evaluation dataset at `./evaluation_dataset.json`
-- Total time: ~15-20 minutes
-
-**What happens:**
-- Loads 6,000 coding samples from KodCode
-- Loads 3,000 math samples from GSM8K
-- Loads 3,000 math samples from LLM-routing dataset
-- Loads 3,000 general samples from TriviaQA
-- Loads 3,000 general samples from LLM-routing (500 per class × 6 classes)
-- Embeds all samples using `all-MiniLM-L6-v2`
-- Stores in ChromaDB with cosine similarity indexing
 
 ### 2️⃣ Run Evaluation
 
@@ -183,13 +153,6 @@ Test the router's performance:
 ```bash
 python src/comprehensive_evaluation.py
 ```
-
-**Generated Files:**
-- `evaluation_results/evaluation_report.md` - Detailed metrics
-- `evaluation_results/accuracy_comparison.png` - Model accuracy chart
-- `evaluation_results/latency_comparison.png` - Response time chart
-- `evaluation_results/confusion_matrix_*.png` - Per-model confusion matrices
-- `evaluation_results/token_length_impact.png` - Query length analysis
 
 ### 3️⃣ Interactive Demo (Streamlit)
 
@@ -206,20 +169,6 @@ Open browser at `http://localhost:8501`
 - Category confidence scores
 - Model response generation
 - Visual similarity heatmaps
-
-### 4️⃣ Embedding Visualization
-
-Generate interactive 2D/3D plots:
-
-```bash
-python src/embedding_visualization.py
-```
-
-**Output:**
-- `embedding_visualizations/tsne_2d_interactive.html` - 2D t-SNE plot
-- `embedding_visualizations/pca_3d_manifolds.html` - 3D PCA plot
-
----
 
 ## 📊 Dataset Details
 
@@ -273,42 +222,6 @@ python src/embedding_visualization.py
 - **Advantage**: All eval samples guaranteed to exist in the vector database
 - Ensures realistic routing performance measurement
 
----
-
-## 📈 Evaluation
-
-### Metrics Tracked
-
-1. **Routing Accuracy**: % of queries correctly classified
-2. **Response Latency**: Time from query to response (ms)
-3. **Confusion Matrix**: Per-category classification errors
-4. **Token Length Impact**: Accuracy vs. query length correlation
-5. **Baseline Comparison**: Performance vs. TF-IDF + SVM and Random Forest
-
-### Evaluation Process
-
-```python
-# Loads 6,000 evaluation samples from evaluation_dataset.json
-# Tests each sample through:
-# 1. Semantic Router (ChromaDB + K-NN)
-# 2. TF-IDF + SVM (baseline)
-# 3. Random Forest (baseline)
-# 4. Measures accuracy and latency
-# 5. Generates confusion matrices
-# 6. Creates visualization charts
-```
-
-### Sample Results
-
-**Typical Performance:**
-- Semantic Router: ~92-95% accuracy, ~15-25ms latency
-- TF-IDF + SVM: ~85-88% accuracy, ~5-10ms latency
-- Random Forest: ~83-86% accuracy, ~3-8ms latency
-
-*Note: Actual results depend on dataset quality and model configuration*
-
----
-
 ## 📁 Project Structure
 
 ```
@@ -332,80 +245,6 @@ prompt_router_for_llms/
 ├── main.py                         # CLI interface
 └── README.md                       # This file
 ```
-
----
-
-## ⚙️ Configuration
-
-Edit `config.py` to customize:
-
-### Dataset Sizes
-
-```python
-CODING_DATASET_SIZE = 6000      # KodCode samples
-MATH_DATASET_SIZE = 3000        # Per math dataset (GSM8K, LLM-routing)
-GENERAL_DATASET_SIZE = 3000     # Per general dataset (TriviaQA, LLM-routing)
-EVALUATION_SET_SIZE = 2000      # Per category for evaluation
-```
-
-### Routing Parameters
-
-```python
-SIMILARITY_THRESHOLD = 0.78     # Min cosine similarity for match
-TOP_K_NEIGHBORS = 3             # K-NN neighbors for voting
-SENTENCE_TRANSFORMER_MODEL = "all-MiniLM-L6-v2"  # Embedding model
-```
-
-### Local Models (Ollama)
-
-```python
-USE_LOCAL_MODELS = True         # Enable Ollama
-OLLAMA_BASE_URL = "http://localhost:11434"
-LOCAL_CODING_MODEL = "deepseek-coder:1.3b"
-LOCAL_MATH_MODEL = "qwen2-math:1.5b"
-LOCAL_GENERAL_MODEL = "llama3.2:1b"
-```
-
-### Reproducibility
-
-```python
-RANDOM_SEED = 42                # Python random seed
-NUMPY_SEED = 42                 # NumPy seed
-TORCH_SEED = 42                 # PyTorch seed
-ENABLE_REPRODUCIBILITY = True   # Deterministic results
-```
-
----
-
-## 🎨 Results
-
-### Accuracy Comparison
-
-The semantic router consistently outperforms traditional ML baselines:
-
-![Accuracy Comparison](evaluation_results/accuracy_comparison.png)
-
-### Latency Analysis
-
-Trade-off between accuracy and response time:
-
-![Latency Comparison](evaluation_results/latency_comparison.png)
-
-### Confusion Matrices
-
-Per-model classification breakdown:
-
-- Semantic Router: Highest accuracy, minimal confusion
-- TF-IDF + SVM: Good performance, some coding/general confusion
-- Random Forest: Fast but less accurate
-
-### Embedding Visualization
-
-Interactive 3D plot showing category clustering:
-
-![3D Embeddings](embedding_visualizations/pca_3d_manifolds.html)
-
-*Open the HTML file in a browser for interactive exploration*
 
 ---
 
@@ -434,50 +273,6 @@ def load_custom_dataset(self) -> List[Dict[str, Any]]:
 
 Then add to `datasets_to_process` list in `build_database()`.
 
-### GPU Monitoring
-
-Track resource usage during evaluation:
-
-```bash
-python src/gpu_monitor.py
-```
-
-### Testing Reproducibility
-
-Verify deterministic behavior:
-
-```bash
-python src/test_reproducibility.py
-```
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Here's how:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Setup
-
-```bash
-# Install dev dependencies
-pip install -r requirements-dev.txt
-
-# Run tests
-pytest tests/
-
-# Format code
-black src/
-isort src/
-```
-
----
-
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
@@ -503,16 +298,3 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 🎯 Roadmap
-
-- [ ] Add more specialized categories (e.g., finance, healthcare)
-- [ ] Implement caching layer for frequent queries
-- [ ] Multi-language support
-- [ ] REST API deployment
-- [ ] Docker containerization
-- [ ] Batch processing mode
-- [ ] Real-time learning from user feedback
-
----
-
-**⭐ If you find this project useful, please consider giving it a star!**
