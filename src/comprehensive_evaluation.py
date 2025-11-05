@@ -24,6 +24,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB
 from catboost import CatBoostClassifier
+from sentence_transformers import SentenceTransformer
 import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
@@ -32,6 +33,7 @@ import warnings
 # --- Real Imports ---
 from semantic_router import SemanticRouter
 from rich.console import Console
+from config import config
 
 warnings.filterwarnings('ignore')
 
@@ -43,6 +45,7 @@ class ComprehensiveEvaluator:
     def __init__(self):
         self.router = None
         self.results = {}
+        self.sentence_model = None  # For Sentence Transformer baseline
         
         evaluation_data = self._load_evaluation_dataset()
         if not evaluation_data:
@@ -108,8 +111,11 @@ class ComprehensiveEvaluator:
     def _initialize_components(self):
         try:
             self.router = SemanticRouter()
+            # Load the same Sentence Transformer model for fair comparison
+            console.print(f"Loading Sentence Transformer model for baseline: {config.SENTENCE_TRANSFORMER_MODEL}")
+            self.sentence_model = SentenceTransformer(config.SENTENCE_TRANSFORMER_MODEL)
         except Exception as e:
-            console.print(f"❌ Failed to initialize SemanticRouter: {e}")
+            console.print(f"❌ Failed to initialize components: {e}")
             raise
     
     def _evaluate_final_performance_for_all(self, X_test, y_test) -> Dict[str, Any]:
@@ -145,6 +151,14 @@ class ComprehensiveEvaluator:
                 # All TF-IDF based models
                 model.fit(X_train_val_vec, self.y_train_val)
                 preds = model.predict(X_test_vec)
+            elif name == "sentence_catboost":
+                # Sentence Transformer + CatBoost (same embeddings as Semantic Router!)
+                console.print("  Encoding training data with Sentence Transformer...")
+                X_train_sent = self.sentence_model.encode(self.X_train_val, convert_to_numpy=True, show_progress_bar=False)
+                console.print("  Encoding test data with Sentence Transformer...")
+                X_test_sent = self.sentence_model.encode(X_test, convert_to_numpy=True, show_progress_bar=False)
+                model.fit(X_train_sent, self.y_train_val)
+                preds = model.predict(X_test_sent)
             else:
                 # Rule-based and dummy classifiers
                 preds = model.predict(X_test.reshape(-1, 1))
@@ -241,6 +255,17 @@ class ComprehensiveEvaluator:
         )
         catboost_classifier.name = "TF-IDF + CatBoost"
         
+        # CatBoost with Sentence Transformer embeddings (same as Semantic Router!)
+        sentence_catboost = CatBoostClassifier(
+            iterations=100,
+            learning_rate=0.1,
+            depth=6,
+            random_state=42,
+            verbose=False,
+            allow_writing_files=False
+        )
+        sentence_catboost.name = "Sentence Transformer + CatBoost"
+        
         return {
             "random": dummy_random, 
             "most_frequent": dummy_freq, 
@@ -249,7 +274,8 @@ class ComprehensiveEvaluator:
             "tfidf_logistic": logistic_classifier,
             "tfidf_rf": rf_classifier,
             "tfidf_nb": nb_classifier,
-            "tfidf_catboost": catboost_classifier
+            "tfidf_catboost": catboost_classifier,
+            "sentence_catboost": sentence_catboost
         }
 
     def _cross_validation_with_baselines(self, X, y) -> Tuple[Dict, Dict]:
@@ -264,7 +290,8 @@ class ComprehensiveEvaluator:
             "TF-IDF + Logistic Regression": [],
             "TF-IDF + Random Forest": [],
             "TF-IDF + Naive Bayes": [],
-            "TF-IDF + CatBoost": []
+            "TF-IDF + CatBoost": [],
+            "Sentence Transformer + CatBoost": []
         }
         vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
         for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
@@ -287,6 +314,12 @@ class ComprehensiveEvaluator:
                     # All TF-IDF based models
                     model.fit(X_train_vec, y_train)
                     preds = model.predict(X_val_vec)
+                elif name == "sentence_catboost":
+                    # Sentence Transformer + CatBoost
+                    X_train_sent = self.sentence_model.encode(X_train, convert_to_numpy=True, show_progress_bar=False)
+                    X_val_sent = self.sentence_model.encode(X_val, convert_to_numpy=True, show_progress_bar=False)
+                    model.fit(X_train_sent, y_train)
+                    preds = model.predict(X_val_sent)
                 else:
                     # Rule-based and dummy classifiers
                     preds = model.predict(X_val.reshape(-1, 1))
@@ -325,6 +358,7 @@ class ComprehensiveEvaluator:
             "TF-IDF + Logistic Regression",
             "TF-IDF + Random Forest",
             "TF-IDF + CatBoost",
+            "Sentence Transformer + CatBoost",
             "Rule-based Keywords"
         ]
         for model_name, performance_data in all_performances.items():
@@ -353,7 +387,8 @@ class ComprehensiveEvaluator:
             'TF-IDF + Logistic Regression': '#E74C3C',  # Red
             'TF-IDF + Random Forest': '#16A085',    # Teal
             'TF-IDF + Naive Bayes': '#9B59B6',     # Light Purple
-            'TF-IDF + CatBoost': '#E67E22'         # Dark Orange
+            'TF-IDF + CatBoost': '#E67E22',        # Dark Orange
+            'Sentence Transformer + CatBoost': '#2ECC71'  # Bright Green
         }
         
         # Figure 1a: Accuracy Comparison (Separate PNG)
@@ -443,12 +478,12 @@ class ComprehensiveEvaluator:
                 plt.savefig(f"{viz_dir}/confusion_matrix_{safe_name}.png", dpi=300, bbox_inches='tight')
                 plt.close()
 
-        # Figure 3: Token Length Impact - MULTI-LINE CHART (Academic Style)
+        # Figure 3: Token Length Impact - GROUPED BAR CHART (Much clearer!)
         token_analyses = results.get('token_length_analysis', {})
         if token_analyses:
-            fig, ax = plt.subplots(figsize=(10, 6))
+            fig, ax = plt.subplots(figsize=(14, 7))
             
-            # Professional color palette matching scatter plot
+            # Professional color palette
             color_map = {
                 'Semantic Router': '#8B4789',
                 'Rule-based Keywords': '#FFC000',
@@ -457,99 +492,87 @@ class ComprehensiveEvaluator:
                 'TF-IDF + Random Forest': '#16A085',
                 'TF-IDF + Naive Bayes': '#9B59B6',
                 'TF-IDF + CatBoost': '#E67E22',
+                'Sentence Transformer + CatBoost': '#2ECC71',
                 'Random Classifier': '#5B9BD5',
                 'Most Frequent Class': '#70AD47'
             }
             
-            # Distinct markers and line styles
-            marker_map = {
-                'Semantic Router': 'o',
-                'Rule-based Keywords': 's',
-                'TF-IDF + SVM': '^',
-                'TF-IDF + Logistic Regression': 'D',
-                'TF-IDF + Random Forest': 'v',
-                'TF-IDF + Naive Bayes': 'p',
-                'TF-IDF + CatBoost': '*',
-                'Random Classifier': 'h',
-                'Most Frequent Class': 'X'
-            }
+            # Prepare data
+            token_ranges = None
+            model_data = {}
             
-            linestyle_map = {
-                'Semantic Router': '-',
-                'Rule-based Keywords': '--',
-                'TF-IDF + SVM': '-',
-                'TF-IDF + Logistic Regression': '-.',
-                'TF-IDF + Random Forest': ':',
-                'TF-IDF + Naive Bayes': '--',
-                'TF-IDF + CatBoost': '-',
-                'Random Classifier': ':',
-                'Most Frequent Class': '-.'
-            }
-            
-            # Plot each model
             for model_name, analysis in token_analyses.items():
                 if analysis.get('results'):
                     df = pd.DataFrame(analysis['results'])
-                    token_ranges = df['token_range'].tolist()
-                    accuracies_per_range = df['accuracy'].tolist()
-                    
-                    color = color_map.get(model_name, '#808080')
-                    marker = marker_map.get(model_name, 'o')
-                    linestyle = linestyle_map.get(model_name, '-')
-                    
-                    # Plot line
-                    ax.plot(token_ranges, accuracies_per_range, 
-                           marker=marker, 
-                           markersize=8,
-                           linewidth=2,
-                           linestyle=linestyle,
-                           label=model_name,
-                           color=color,
-                           markeredgecolor='black',
-                           markeredgewidth=1,
-                           alpha=0.9)
+                    if token_ranges is None:
+                        token_ranges = df['token_range'].tolist()
+                    model_data[model_name] = df['accuracy'].tolist()
             
-            # Formatting
-            ax.set_xlabel("Query Token Length Range", fontsize=12)
-            ax.set_ylabel("Accuracy", fontsize=12)
-            ax.set_title('Model Performance Across Token Length Ranges', 
-                        fontsize=13, pad=12)
-            
-            # Format y-axis as percentage
-            ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0%}'))
-            
-            # Professional grid
-            ax.grid(True, alpha=0.25, linestyle='-', linewidth=0.5, color='gray')
-            ax.set_axisbelow(True)
-            
-            # Set appropriate y-limits - ZOOMED IN to 40-100% range for better visibility
-            all_accuracies = []
-            for analysis in token_analyses.values():
-                if analysis.get('results'):
-                    all_accuracies.extend([r['accuracy'] for r in analysis['results']])
-            
-            if all_accuracies:
-                min_acc = min(all_accuracies)
-                max_acc = max(all_accuracies)
+            if token_ranges and model_data:
+                # Set up bar positions
+                x = np.arange(len(token_ranges))
+                width = 0.12  # Width of each bar
+                num_models = len(model_data)
                 
-                # Zoom in to focus on the performance range (typically 40-100%)
-                # This elongates the top section for better differentiation
-                if min_acc > 0.4:  # If minimum is above 40%, zoom in
-                    ax.set_ylim(0.4, 1.02)  # 40-100% range
-                elif min_acc > 0.6:  # If minimum is above 60%, zoom in more
-                    ax.set_ylim(0.6, 1.02)  # 60-100% range
-                else:
-                    ax.set_ylim(0, 1.05)  # Full range if data varies widely
-            
-            # Legend
-            ax.legend(loc='best', fontsize=10, framealpha=0.95, 
-                     edgecolor='gray', fancybox=False)
-            
-            plt.xticks(fontsize=11)
-            plt.yticks(fontsize=11)
-            plt.tight_layout()
-            plt.savefig(f"{viz_dir}/token_length_impact.png", dpi=300, bbox_inches='tight')
-            plt.close()
+                # Calculate starting position to center the groups
+                start_offset = -(num_models - 1) * width / 2
+                
+                # Plot bars for each model
+                for idx, (model_name, accuracies) in enumerate(model_data.items()):
+                    offset = start_offset + idx * width
+                    color = color_map.get(model_name, '#808080')
+                    
+                    bars = ax.bar(x + offset, accuracies, width, 
+                                 label=model_name, 
+                                 color=color,
+                                 edgecolor='black',
+                                 linewidth=0.8,
+                                 alpha=0.85)
+                    
+                    # Add percentage labels on top of bars
+                    for bar, acc in zip(bars, accuracies):
+                        height = bar.get_height()
+                        if height > 0.5:  # Only label if bar is visible enough
+                            ax.text(bar.get_x() + bar.get_width()/2., height,
+                                   f'{acc:.0%}',
+                                   ha='center', va='bottom', 
+                                   fontsize=7, fontweight='bold',
+                                   rotation=0)
+                
+                # Formatting
+                ax.set_xlabel("Query Token Length Range", fontsize=13, fontweight='bold')
+                ax.set_ylabel("Accuracy", fontsize=13, fontweight='bold')
+                ax.set_title('Model Performance Across Token Length Ranges (Grouped Comparison)', 
+                            fontsize=14, fontweight='bold', pad=15)
+                ax.set_xticks(x)
+                ax.set_xticklabels(token_ranges, fontsize=11)
+                
+                # Format y-axis as percentage
+                ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{y:.0%}'))
+                
+                # Set y-limits for better visibility (zoom to 40-100%)
+                all_accuracies = [acc for accs in model_data.values() for acc in accs]
+                if all_accuracies:
+                    min_acc = min(all_accuracies)
+                    if min_acc > 0.4:
+                        ax.set_ylim(0.4, 1.05)
+                    else:
+                        ax.set_ylim(0, 1.05)
+                
+                # Grid
+                ax.grid(axis='y', alpha=0.3, linestyle='--', linewidth=0.8)
+                ax.set_axisbelow(True)
+                
+                # Legend - place outside plot area to avoid clutter
+                ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1), 
+                         fontsize=9, framealpha=0.95, 
+                         edgecolor='gray', fancybox=False)
+                
+                plt.tight_layout()
+                plt.savefig(f"{viz_dir}/token_length_impact.png", dpi=300, bbox_inches='tight')
+                plt.close()
+            else:
+                console.print("⚠️ No token length data available for visualization")
 
         console.print(f"✅ Visualizations saved to '{viz_dir}/' directory.")
 
