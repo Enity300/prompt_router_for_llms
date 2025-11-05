@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual Environment
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Project Specific
+data/db/
+data/db_backup/
+evaluation_dataset.json
+temp_eval_*.json
+
+# Environment Variables
+.env
+
+# OS
+.DS_Store
+Thumbs.db
