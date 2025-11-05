@@ -21,8 +21,8 @@ class Config:
     
     # Dataset Configuration - Conservative Scaling (5,000 total embeddings)
     CODING_DATASET_SIZE: int = int(os.getenv("CODING_DATASET_SIZE", "6000"))
-    MATH_DATASET_SIZE: int = int(os.getenv("MATH_DATASET_SIZE", "3000"))
-    GENERAL_DATASET_SIZE: int = int(os.getenv("GENERAL_DATASET_SIZE", "3000"))
+    MATH_DATASET_SIZE: int = int(os.getenv("MATH_DATASET_SIZE", "6000"))
+    GENERAL_DATASET_SIZE: int = int(os.getenv("GENERAL_DATASET_SIZE", "6000"))
     
     # Routing Configuration - Enhanced for Larger Dataset
     TOP_K_NEIGHBORS: int = int(os.getenv("TOP_K_NEIGHBORS", "3"))
