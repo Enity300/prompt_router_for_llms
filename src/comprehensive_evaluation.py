@@ -522,7 +522,7 @@ class ComprehensiveEvaluator:
             ax.grid(True, alpha=0.25, linestyle='-', linewidth=0.5, color='gray')
             ax.set_axisbelow(True)
             
-            # Set appropriate y-limits
+            # Set appropriate y-limits - ZOOMED IN to 40-100% range for better visibility
             all_accuracies = []
             for analysis in token_analyses.values():
                 if analysis.get('results'):
@@ -531,14 +531,15 @@ class ComprehensiveEvaluator:
             if all_accuracies:
                 min_acc = min(all_accuracies)
                 max_acc = max(all_accuracies)
-                range_acc = max_acc - min_acc
                 
-                # Set limits based on data range
-                if range_acc > 0.3:  # Large variation
-                    ax.set_ylim(0, 1.05)
-                else:  # Small variation - zoom in
-                    y_padding = max(0.05, range_acc * 0.2)
-                    ax.set_ylim(max(0, min_acc - y_padding), min(1.05, max_acc + y_padding))
+                # Zoom in to focus on the performance range (typically 40-100%)
+                # This elongates the top section for better differentiation
+                if min_acc > 0.4:  # If minimum is above 40%, zoom in
+                    ax.set_ylim(0.4, 1.02)  # 40-100% range
+                elif min_acc > 0.6:  # If minimum is above 60%, zoom in more
+                    ax.set_ylim(0.6, 1.02)  # 60-100% range
+                else:
+                    ax.set_ylim(0, 1.05)  # Full range if data varies widely
             
             # Legend
             ax.legend(loc='best', fontsize=10, framealpha=0.95, 
