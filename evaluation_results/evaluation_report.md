@@ -1,20 +1,21 @@
 # Comprehensive Evaluation Report
 
-**Date**: 2025-11-06 01:09:33
+**Date**: 2025-11-06 03:08:01
 
 ## 1. Overall Performance Comparison
 
 | Model | Accuracy | Avg Latency (ms) | Throughput (q/s) |
 |---|---|---|---|
-| **Semantic Router** | **1.000** | 43.915 | 22.77 |
-| **TF-IDF + Random Forest** | **0.962** | 0.357 | 2803.27 |
-| **TF-IDF + Logistic Regression** | **0.955** | 0.016 | 64229.34 |
-| **TF-IDF + SVM** | **0.949** | 0.488 | 2050.69 |
-| **TF-IDF + CatBoost** | **0.928** | 1.950 | 512.93 |
-| **TF-IDF + Naive Bayes** | **0.856** | 0.001 | 746013.49 |
-| **Rule-based Keywords** | **0.681** | 0.026 | 38669.88 |
-| **Random Classifier** | **0.352** | 0.000 | 5459508.64 |
-| **Most Frequent Class** | **0.333** | 0.000 | 8166042.96 |
+| **Semantic Router** | **1.000** | 53.624 | 18.65 |
+| **Sentence Transformer + CatBoost** | **0.965** | 45.439 | 22.01 |
+| **TF-IDF + Random Forest** | **0.962** | 0.362 | 2763.58 |
+| **TF-IDF + Logistic Regression** | **0.955** | 0.016 | 63371.02 |
+| **TF-IDF + SVM** | **0.949** | 0.478 | 2092.92 |
+| **TF-IDF + CatBoost** | **0.928** | 1.997 | 500.79 |
+| **TF-IDF + Naive Bayes** | **0.856** | 0.001 | 800560.39 |
+| **Rule-based Keywords** | **0.681** | 0.028 | 35195.05 |
+| **Random Classifier** | **0.352** | 0.000 | 5295675.34 |
+| **Most Frequent Class** | **0.333** | 0.000 | 7069218.94 |
 
 ## 2. Per-Category Performance (F1-Score)
 
@@ -29,6 +30,7 @@
 | TF-IDF + Random Forest | 0.992 | 0.949 | 0.946 |
 | TF-IDF + Naive Bayes | 0.864 | 0.776 | 0.915 |
 | TF-IDF + CatBoost | 0.985 | 0.908 | 0.889 |
+| Sentence Transformer + CatBoost | 0.979 | 0.960 | 0.957 |
 
 ## 3. Statistical Significance (vs Semantic Router)
 
@@ -42,6 +44,7 @@
 | Semantic Router vs TF-IDF + Random Forest | 11.642 | 0.0003 | ✅ Yes |
 | Semantic Router vs TF-IDF + Naive Bayes | 15.019 | 0.0001 | ✅ Yes |
 | Semantic Router vs TF-IDF + CatBoost | 12.780 | 0.0002 | ✅ Yes |
+| Semantic Router vs Sentence Transformer + CatBoost | 8.835 | 0.0009 | ✅ Yes |
 
 ## 4. Token Length Impact Analysis
 
@@ -104,4 +107,14 @@
 | 11-20 | 355 | 92.11% |
 | 21-50 | 685 | 86.72% |
 | 51+ | 1035 | 95.85% |
+
+### Sentence Transformer + CatBoost
+
+| Token Range | Sample Count | Accuracy |
+|---|---|---|
+| 1-5 | 38 | 100.00% |
+| 6-10 | 286 | 97.55% |
+| 11-20 | 355 | 94.37% |
+| 21-50 | 685 | 95.77% |
+| 51+ | 1035 | 97.39% |
 
