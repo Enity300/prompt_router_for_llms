@@ -540,7 +540,7 @@ class ComprehensiveEvaluator:
                                    rotation=0)
                 
                 # Formatting
-                ax.set_xlabel("Query Token Length Range", fontsize=13, fontweight='bold')
+                ax.set_xlabel("Number of Tokens", fontsize=13, fontweight='bold')
                 ax.set_ylabel("Accuracy", fontsize=13, fontweight='bold')
                 ax.set_title('Model Performance Across Token Length Ranges (Grouped Comparison)', 
                             fontsize=14, fontweight='bold', pad=15)
