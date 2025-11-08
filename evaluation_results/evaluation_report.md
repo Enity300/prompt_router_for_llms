@@ -1,21 +1,21 @@
 # Comprehensive Evaluation Report
 
-**Date**: 2025-11-06 03:08:01
+**Date**: 2025-11-08 22:21:37
 
 ## 1. Overall Performance Comparison
 
 | Model | Accuracy | Avg Latency (ms) | Throughput (q/s) |
 |---|---|---|---|
-| **Semantic Router** | **1.000** | 53.624 | 18.65 |
-| **Sentence Transformer + CatBoost** | **0.965** | 45.439 | 22.01 |
-| **TF-IDF + Random Forest** | **0.962** | 0.362 | 2763.58 |
-| **TF-IDF + Logistic Regression** | **0.955** | 0.016 | 63371.02 |
-| **TF-IDF + SVM** | **0.949** | 0.478 | 2092.92 |
-| **TF-IDF + CatBoost** | **0.928** | 1.997 | 500.79 |
-| **TF-IDF + Naive Bayes** | **0.856** | 0.001 | 800560.39 |
-| **Rule-based Keywords** | **0.681** | 0.028 | 35195.05 |
-| **Random Classifier** | **0.352** | 0.000 | 5295675.34 |
-| **Most Frequent Class** | **0.333** | 0.000 | 7069218.94 |
+| **Semantic Router** | **1.000** | 55.278 | 18.09 |
+| **Sentence Transformer + CatBoost** | **0.965** | 57.217 | 17.48 |
+| **TF-IDF + Random Forest** | **0.962** | 0.407 | 2456.14 |
+| **TF-IDF + Logistic Regression** | **0.955** | 0.017 | 59666.32 |
+| **TF-IDF + SVM** | **0.949** | 0.491 | 2035.52 |
+| **TF-IDF + CatBoost** | **0.928** | 2.247 | 444.98 |
+| **TF-IDF + Naive Bayes** | **0.856** | 0.001 | 795887.91 |
+| **Rule-based Keywords** | **0.681** | 0.030 | 33594.53 |
+| **Random Classifier** | **0.352** | 0.000 | 5504587.13 |
+| **Most Frequent Class** | **0.333** | 0.000 | 7132243.66 |
 
 ## 2. Per-Category Performance (F1-Score)
 
