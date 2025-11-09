@@ -6,11 +6,15 @@ import chromadb
 from chromadb.config import Settings
 import time
 from sklearn.metrics.pairwise import cosine_similarity
+import logging
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import config
 from utils.model_loader import get_sentence_transformer
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 
 class SemanticRouterError(Exception):
@@ -19,6 +23,8 @@ class SemanticRouterError(Exception):
 
 
 class SemanticRouter:
+    # Expected embedding dimension for all-MiniLM-L6-v2
+    EXPECTED_EMBEDDING_DIM = 384
     
     def __init__(self, model_name: Optional[str] = None, db_path: Optional[str] = None):
        
@@ -28,6 +34,10 @@ class SemanticRouter:
         self.client = None
         self.collection = None
         self.cache = OrderedDict()  # LRU cache using OrderedDict
+        
+        # Cache statistics tracking
+        self.cache_hits = 0
+        self.cache_misses = 0
         
         self._initialize_components()
     
@@ -81,6 +91,13 @@ class SemanticRouter:
             embedding = self.model.encode([prompt], convert_to_numpy=True)
             embedding = embedding[0]  # Get single embedding vector
             
+            # Validate embedding dimensions (Issue #3 fix)
+            if embedding.shape[0] != self.EXPECTED_EMBEDDING_DIM:
+                raise SemanticRouterError(
+                    f"Embedding dimension mismatch: expected {self.EXPECTED_EMBEDDING_DIM}, "
+                    f"got {embedding.shape[0]}. Model may be misconfigured."
+                )
+            
             # Normalize to unit norm (consistent with database storage)
             norm = np.linalg.norm(embedding)
             if norm > 1e-8:
@@ -99,11 +116,15 @@ class SemanticRouter:
             similarity = cosine_similarity([embedding], [cached_embedding])[0][0]
             
             if similarity >= config.CACHE_SIMILARITY_THRESHOLD:
-                print(f"🎯 Cache hit! Similarity: {similarity:.4f} with: '{cached_prompt[:50]}...'")
+                logger.info(f"Cache hit! Similarity: {similarity:.4f} with: '{cached_prompt[:50]}...'")
                 # Move to end (most recently used) to maintain LRU order
                 self.cache.move_to_end(cached_prompt)
+                # Track cache statistics (Recommendation #1)
+                self.cache_hits += 1
                 return cached_data["category"]
         
+        # Track cache miss (Recommendation #1)
+        self.cache_misses += 1
         return None
     
     def _update_cache(self, prompt: str, embedding: np.ndarray, category: str):
@@ -119,8 +140,20 @@ class SemanticRouter:
             "timestamp": time.time()
         }
     
-    def _query_expertise_manifolds(self, embedding: np.ndarray) -> Tuple[str, float, Dict[str, Any]]: 
-       
+    def _calibrate_confidence(self, similarity: float, category: str) -> Tuple[float, str]:
+        """Calibrate confidence score and provide interpretation (Recommendation #2)"""
+        if similarity > 0.95:
+            return similarity, f"Very high confidence - strong match to {category} examples"
+        elif similarity > 0.85:
+            return similarity, f"High confidence - good match to {category} examples"
+        elif similarity > config.SIMILARITY_THRESHOLD:
+            return similarity, f"Medium confidence - moderate match to {category} examples"
+        else:
+            # Out-of-distribution case
+            return 1 - similarity, "Low confidence - no strong match found, using fallback"
+    
+    def _query_expertise_manifolds(self, embedding: np.ndarray) -> Tuple[str, float, str, Dict[str, Any]]: 
+        """Query database with multi-neighbor voting (Recommendation #3)"""
         try:
             # Query ChromaDB for nearest neighbors
             results = self.collection.query(
@@ -132,32 +165,68 @@ class SemanticRouter:
             if not results['metadatas'] or not results['metadatas'][0]:
                 raise SemanticRouterError("No similar examples found in expertise database")
             
-            # Get the closest match
+            # Multi-neighbor voting (Recommendation #3)
+            votes = {}
+            all_neighbors = []
+            
+            for i, (metadata, distance, document) in enumerate(zip(
+                results['metadatas'][0],
+                results['distances'][0],
+                results['documents'][0]
+            )):
+                category = metadata['category']
+                similarity = 1 - distance
+                votes[category] = votes.get(category, 0) + 1
+                
+                all_neighbors.append({
+                    "rank": i + 1,
+                    "category": category,
+                    "similarity": similarity,
+                    "document": document[:100] + "..." if len(document) > 100 else document,
+                    "source": metadata.get('source', 'unknown')
+                })
+            
+            # Determine category by majority vote
+            category = max(votes, key=votes.get)
+            vote_confidence = votes[category] / len(results['metadatas'][0])
+            
+            # Get closest match details
             closest_metadata = results['metadatas'][0][0]
-            closest_distance = results['distances'][0][0]  # ChromaDB returns cosine distance
+            closest_distance = results['distances'][0][0]
             closest_document = results['documents'][0][0]
-            # Convert cosine distance to cosine similarity
-            # ChromaDB with cosine space returns: distance = 1 - cosine_similarity
-            # Therefore: similarity = 1 - distance
             similarity_score = 1 - closest_distance
             
-            category = closest_metadata['category']
+            # Calibrate confidence (Recommendation #2)
+            calibrated_confidence, confidence_level = self._calibrate_confidence(similarity_score, category)
             
             routing_info = {
                 "closest_example": closest_document,
                 "similarity_score": similarity_score,
-                "l2_distance": closest_distance,
+                "cosine_distance": closest_distance,
                 "source": closest_metadata.get('source', 'unknown'),
-                "metadata": closest_metadata
+                "metadata": closest_metadata,
+                "vote_confidence": vote_confidence,
+                "votes": votes,
+                "all_neighbors": all_neighbors,
+                "confidence_level": confidence_level
             }
             
-            return category, similarity_score, routing_info
+            return category, similarity_score, confidence_level, routing_info
             
         except Exception as e:
             raise SemanticRouterError(f"Failed to query expertise manifolds: {e}")
     
+    def _generate_explanation(self, category: str, similarity: float, confidence_level: str) -> str:
+        """Generate human-readable explanation for routing decision (Recommendation #5)"""
+        if similarity > 0.9:
+            return f"Very similar to {category} examples in database ({confidence_level})"
+        elif similarity > config.SIMILARITY_THRESHOLD:
+            return f"Moderately similar to {category} examples ({confidence_level})"
+        else:
+            return f"No strong match found (similarity: {similarity:.3f}), using general knowledge fallback"
+    
     def route(self, prompt: str) -> Dict[str, Any]:
-       
+        """Route a prompt to the appropriate specialist category"""
         start_time = time.time()
         
         try:
@@ -176,36 +245,45 @@ class SemanticRouter:
                 return {
                     "category": cached_category,
                     "confidence": 1.0,  # High confidence for cached results
+                    "confidence_level": "cached",
                     "reasoning": "Retrieved from semantic cache",
+                    "explanation": "Exact or very similar query found in cache",
                     "routing_time": time.time() - start_time,
                     "from_cache": True,
                     "prompt": prompt
                 }
             
-            # Step 3: Query expertise manifolds
-            category, similarity_score, routing_info = self._query_expertise_manifolds(embedding)
+            # Step 3: Query expertise manifolds with voting
+            category, similarity_score, confidence_level, routing_info = self._query_expertise_manifolds(embedding)
             
             # Step 4: Apply similarity threshold for out-of-distribution detection
             if similarity_score < config.SIMILARITY_THRESHOLD:
                 category = "general_knowledge"
-                reasoning = f"Out-of-distribution query (similarity: {similarity_score:.4f} < threshold: {config.SIMILARITY_THRESHOLD})"
                 confidence = 1 - similarity_score  # Lower similarity = higher confidence it's OOD
+                confidence_level = "low"
             else:
-                reasoning = f"Matched {category} expertise (similarity: {similarity_score:.4f})"
                 confidence = similarity_score
             
-            # Step 5: Update cache
+            # Step 5: Generate explanation (Recommendation #5)
+            explanation = self._generate_explanation(category, similarity_score, confidence_level)
+            reasoning = f"Matched {category} expertise (similarity: {similarity_score:.4f})"
+            
+            # Step 6: Update cache
             self._update_cache(prompt, embedding, category)
             
             routing_result = {
                 "category": category,
                 "confidence": confidence,
+                "confidence_level": confidence_level,
                 "reasoning": reasoning,
+                "explanation": explanation,
                 "routing_time": time.time() - start_time,
                 "from_cache": False,
                 "prompt": prompt,
                 "routing_info": routing_info
             }
+            
+            logger.info(f"Routed to {category} (confidence: {confidence:.3f}, level: {confidence_level})")
             
             return routing_result
             
@@ -214,12 +292,17 @@ class SemanticRouter:
         except Exception as e:
             raise SemanticRouterError(f"Unexpected error during routing: {e}")
     
+    def get_cache_hit_rate(self) -> float:
+        """Calculate cache hit rate (Recommendation #1)"""
+        total = self.cache_hits + self.cache_misses
+        return self.cache_hits / total if total > 0 else 0.0
+    
     def get_statistics(self) -> Dict[str, Any]:
-     
+        """Get comprehensive router statistics"""
         try:
             collection_count = self.collection.count() if self.collection else 0
             
-            # Get category distribution
+            # Get category distribution (Issue #1 fix - use Exception instead of bare except)
             category_stats = {}
             if self.collection:
                 for category in ["coding", "math", "general_knowledge"]:
@@ -231,8 +314,11 @@ class SemanticRouter:
                         )
                         # This is a rough way to count 
                         category_stats[category] = "available"
-                    except:
+                    except Exception:  # Fixed: was bare except
                         category_stats[category] = "not available"
+            
+            # Calculate cache statistics
+            cache_hit_rate = self.get_cache_hit_rate()
             
             return {
                 "model_name": self.model_name,
@@ -241,9 +327,14 @@ class SemanticRouter:
                 "total_embeddings": collection_count,
                 "similarity_threshold": config.SIMILARITY_THRESHOLD,
                 "cache_size": len(self.cache),
+                "cache_max_size": config.CACHE_SIZE,
                 "cache_threshold": config.CACHE_SIMILARITY_THRESHOLD,
+                "cache_hits": self.cache_hits,
+                "cache_misses": self.cache_misses,
+                "cache_hit_rate": cache_hit_rate,
                 "category_stats": category_stats,
-                "top_k_neighbors": config.TOP_K_NEIGHBORS
+                "top_k_neighbors": config.TOP_K_NEIGHBORS,
+                "embedding_dimension": self.EXPECTED_EMBEDDING_DIM
             }
             
         except Exception as e:
