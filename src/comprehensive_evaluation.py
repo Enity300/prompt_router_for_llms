@@ -28,6 +28,8 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
 import warnings
+import logging
+from tqdm import tqdm
 
 # --- Real Imports ---
 from semantic_router import SemanticRouter
@@ -36,6 +38,10 @@ from config import config
 from utils.model_loader import get_sentence_transformer
 
 warnings.filterwarnings('ignore')
+
+# Configure logging (Issue #4 fix)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Initialize the real console for rich text output
 console = Console()
@@ -119,17 +125,26 @@ class ComprehensiveEvaluator:
             raise
     
     def _evaluate_final_performance_for_all(self, X_test, y_test) -> Dict[str, Any]:
+        # Issue #1 fix: Input validation
+        if len(X_test) != len(y_test):
+            raise ValueError(f"Length mismatch: X_test has {len(X_test)} samples, y_test has {len(y_test)} labels")
+        if len(X_test) == 0:
+            raise ValueError("Empty test set provided")
+        
         all_performances = {}
         
         # 1. Evaluate Semantic Router
         console.print("Benchmarking Semantic Router...")
         sr_predictions, sr_latencies = [], []
-        for query in X_test:
+        # Issue #3 fix: Add progress bar
+        for query in tqdm(X_test, desc="Evaluating Semantic Router", leave=False):
             start_time = time.perf_counter()
             try:
                 result = self.router.route(query)
                 predicted_category = result['category'] if result else None
-            except Exception:
+            except Exception as e:
+                # Issue #4 fix: Better error handling with logging
+                logger.warning(f"Router failed on query: '{query[:50]}...' Error: {e}")
                 predicted_category = None
             latency = time.perf_counter() - start_time
             sr_predictions.append(predicted_category)
@@ -197,12 +212,19 @@ class ComprehensiveEvaluator:
         y_true_flat = np.array(y_true).flatten().tolist()
         
         report = classification_report(y_true_flat, y_pred_flat, output_dict=True, zero_division=0)
+        
+        # Issue #3 fix: Only store routing decisions if needed for token analysis
+        # Store minimal data to reduce memory usage
         routing_decisions = None
         if queries is not None:
-             routing_decisions = [{
-                "query": q, "true_category": gt, "predicted_category": p,
+            # Only store essential fields
+            routing_decisions = [{
+                "query": q,
+                "true_category": gt,
+                "predicted_category": p,
                 "correct": gt == p
             } for q, gt, p in zip(queries, y_true_flat, y_pred_flat)]
+        
         return {
             "accuracy": accuracy_score(y_true_flat, y_pred_flat),
             "classification_report": report,
@@ -314,38 +336,52 @@ class ComprehensiveEvaluator:
             "TF-IDF + CatBoost": [],
             "Sentence Transformer + CatBoost": []
         }
+        
+        # Issue #2 fix: Pre-encode all data once for efficiency
+        console.print("Pre-encoding all data with Sentence Transformer (one-time operation)...")
+        X_encoded_all = self.sentence_model.encode(X, convert_to_numpy=True, show_progress_bar=True)
+        console.print("✅ Encoding complete. Starting cross-validation...")
+        
         for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
             console.print(f"Running Cross-Validation Fold {fold+1}/{k_folds}...")
             X_train, X_val, y_train, y_val = X[train_idx], X[val_idx], y[train_idx], y[val_idx]
+            
+            # Get pre-encoded embeddings for this fold
+            X_train_sent = X_encoded_all[train_idx]
+            X_val_sent = X_encoded_all[val_idx]
+            
             val_preds_sr = []
             for q in X_val:
                 try:
                     result = self.router.route(q)
                     predicted_category = result['category'] if result else None
-                except Exception:
+                except Exception as e:
+                    # Issue #4 fix: Better error handling
+                    logger.warning(f"Router failed during CV fold {fold+1}: {e}")
                     predicted_category = None
                 val_preds_sr.append(predicted_category)
             ss_ger_fold_accuracies.append(accuracy_score(y_val, val_preds_sr))
+            
             baselines = self._get_baseline_models(X_train, y_train)
             # Fit vectorizer only on training data to prevent data leakage
             vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
             X_train_vec = vectorizer.fit_transform(X_train)
             X_val_vec = vectorizer.transform(X_val)
+            
             for name, model in baselines.items():
                 if name.startswith("tfidf_"):
                     # All TF-IDF based models
                     model.fit(X_train_vec, y_train)
                     preds = model.predict(X_val_vec)
                 elif name == "sentence_catboost":
-                    # Sentence Transformer + CatBoost
-                    X_train_sent = self.sentence_model.encode(X_train, convert_to_numpy=True, show_progress_bar=False)
-                    X_val_sent = self.sentence_model.encode(X_val, convert_to_numpy=True, show_progress_bar=False)
+                    # Issue #2 fix: Use pre-encoded embeddings (no re-encoding!)
                     model.fit(X_train_sent, y_train)
                     preds = model.predict(X_val_sent)
                 else:
                     # Rule-based and dummy classifiers
                     preds = model.predict(X_val.reshape(-1, 1))
                 baseline_fold_scores[model.name].append(accuracy_score(y_val, preds))
+        
         return {"fold_accuracies": ss_ger_fold_accuracies}, baseline_fold_scores
 
     def _statistical_significance_testing(self, ss_ger_accuracies: List[float], baseline_cv_scores: Dict[str, List[float]]) -> Dict[str, Any]:
@@ -373,21 +409,18 @@ class ComprehensiveEvaluator:
     # MODIFIED: This function now orchestrates the analysis for multiple models
     def _analyze_token_length_for_all_models(self, all_performances: Dict[str, Any]) -> Dict[str, Any]:
         all_token_analyses = {}
-        # Define which models are relevant for this analysis (top performers + semantic router)
-        relevant_models = [
-            "Semantic Router", 
-            "TF-IDF + SVM", 
-            "TF-IDF + Logistic Regression",
-            "TF-IDF + Random Forest",
-            "TF-IDF + CatBoost",
-            "Sentence Transformer + CatBoost",
-            "Rule-based Keywords"
-        ]
+        
+        # Issue #5 fix: Dynamic model selection instead of hardcoded list
+        # Analyze all models that have routing decisions data
         for model_name, performance_data in all_performances.items():
-            if model_name in relevant_models:
+            # Only analyze if routing decisions are available
+            if performance_data.get('routing_decisions'):
                 console.print(f"Analyzing token length impact for {model_name}...")
                 analysis = self._perform_token_length_analysis(model_name, performance_data['routing_decisions'])
                 all_token_analyses[model_name] = analysis
+            else:
+                logger.debug(f"Skipping token analysis for {model_name} (no routing decisions)")
+        
         return all_token_analyses
 
     def _generate_visualizations(self, results: Dict[str, Any]):
