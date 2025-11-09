@@ -381,12 +381,17 @@ class ExpertiseDBBuilder:
             print("Skipping LLM Routing math dataset.")
             return [], []
 
-    def embed_and_store_samples(self, samples: List[Dict[str, Any]], batch_size: int = 32):
+    def embed_and_store_samples(self, samples: List[Dict[str, Any]], batch_size: int = None):
         """Embed samples and store them in ChromaDB"""
         if not samples:
             print("No samples to embed and store.")
             return
-        print(f"Embedding and storing {len(samples)} samples...")
+        
+        # Use config batch size if not specified
+        if batch_size is None:
+            batch_size = config.EMBEDDING_BATCH_SIZE
+        
+        print(f"Embedding and storing {len(samples)} samples (batch_size={batch_size})...")
         for i in range(0, len(samples), batch_size):
             batch = samples[i:i + batch_size]
             prompts = [sample["prompt"] for sample in batch]

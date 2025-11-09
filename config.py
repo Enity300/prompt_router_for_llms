@@ -30,6 +30,9 @@ class Config:
     CACHE_SIZE: int = int(os.getenv("CACHE_SIZE", "100"))
     CACHE_SIMILARITY_THRESHOLD: float = float(os.getenv("CACHE_SIMILARITY_THRESHOLD", "0.95"))
     
+    # Embedding Configuration
+    EMBEDDING_BATCH_SIZE: int = int(os.getenv("EMBEDDING_BATCH_SIZE", "32"))
+    
     # Reproducibility Configuration
     RANDOM_SEED: int = int(os.getenv("RANDOM_SEED", "42"))
     NUMPY_SEED: int = int(os.getenv("NUMPY_SEED", "42"))
