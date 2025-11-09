@@ -4,7 +4,6 @@ from typing import List, Dict, Any, Tuple
 import numpy as np
 from tqdm import tqdm
 from datasets import load_dataset
-from sentence_transformers import SentenceTransformer
 import chromadb
 from chromadb.config import Settings
 import random
@@ -16,12 +15,10 @@ import gc  # For garbage collection to free memory
 try:
     sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     from config import config
+    from utils.model_loader import get_sentence_transformer
 except ImportError as e:
-    print(f"Error importing config: {e}")
+    print(f"Error importing config or utils: {e}")
     sys.exit(1)
-
-# <<< MODIFICATION: Added constant for evaluation set size
-EVALUATION_SET_SIZE = 2000
 
 class ExpertiseDBBuilder:
 
@@ -33,7 +30,8 @@ class ExpertiseDBBuilder:
     def initialize_components(self):
         print(f"Loading sentence transformer model: {config.SENTENCE_TRANSFORMER_MODEL}")
         try:
-            self.model = SentenceTransformer(config.SENTENCE_TRANSFORMER_MODEL)
+            # Use shared singleton model instance
+            self.model = get_sentence_transformer()
         except Exception as e:
             print(f"❌ Failed to load SentenceTransformer model: {e}")
             raise
@@ -58,18 +56,18 @@ class ExpertiseDBBuilder:
             pass
 
         try:
-            print(f"Creating new collection: {config.COLLECTION_NAME}")
+            print(f"Creating new collection: {config.COLLECTION_NAME} with cosine distance metric")
             self.collection = self.client.create_collection(
                 name=config.COLLECTION_NAME,
                 metadata={"hnsw:space": "cosine"}
             )
-            print(f"Successfully created collection '{config.COLLECTION_NAME}'.")
+            print(f"✅ Successfully created collection '{config.COLLECTION_NAME}' with cosine distance.")
         except Exception as e:
             print(f"❌ Failed to create ChromaDB collection '{config.COLLECTION_NAME}': {e}")
             raise
 
-    # <<< MODIFICATION: Function now only returns db_samples (no eval samples yet)
-    def load_coding_dataset(self) -> List[Dict[str, Any]]:
+    # MODIFIED: Returns BOTH db_samples and eval_samples (NO DATA LEAKAGE)
+    def load_coding_dataset(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         print("Loading coding dataset (KodCode/KodCode-V1)...")
         dataset_name = "KodCode/KodCode-V1"
         prompt_field_name = 'question'
@@ -80,19 +78,27 @@ class ExpertiseDBBuilder:
                 raise ValueError(f"Loaded {dataset_name} dataset split is empty.")
 
             db_size = config.CODING_DATASET_SIZE
-            if len(dataset_list) < db_size:
-                print(f"⚠️ Warning: Dataset has {len(dataset_list)} records, but {db_size} are required for DB. Adjusting sizes.")
-                db_size = min(db_size, len(dataset_list))
+            eval_size = config.EVALUATION_SET_SIZE
+            total_needed = db_size + eval_size
             
-            # --- MODIFICATION: Random sampling from dataset for DB ---
-            print(f"Randomly sampling {db_size} samples for the database...")
+            if len(dataset_list) < total_needed:
+                print(f"⚠️ Warning: Dataset has {len(dataset_list)} records, but {total_needed} are required. Adjusting sizes.")
+                ratio = len(dataset_list) / total_needed
+                db_size = int(db_size * ratio)
+                eval_size = int(eval_size * ratio)
+            
+            # --- CRITICAL FIX: Split dataset FIRST (no overlap!) ---
+            print(f"Splitting dataset: {db_size} for DB, {eval_size} for evaluation (NO OVERLAP)")
             all_indices = list(range(len(dataset_list)))
             random.shuffle(all_indices)
             db_indices = all_indices[:db_size]
+            eval_indices = all_indices[db_size:db_size + eval_size]
             db_records = [dataset_list[i] for i in db_indices]
+            eval_records = [dataset_list[i] for i in eval_indices]
             # ---
             
             db_samples = []
+            eval_samples = []
 
             for item in tqdm(db_records, desc="Processing coding DB samples"):
                 prompt = item.get(prompt_field_name)
@@ -102,21 +108,29 @@ class ExpertiseDBBuilder:
                         "category": "coding",
                         "source": "KodCode-V1"
                     })
+            
+            for item in tqdm(eval_records, desc="Processing coding EVAL samples"):
+                prompt = item.get(prompt_field_name)
+                if prompt and prompt.strip():
+                    eval_samples.append({
+                        "query": prompt.strip(),
+                        "category": "coding"
+                    })
 
-            print(f"Successfully processed {len(db_samples)} DB samples.")
-            return db_samples
+            print(f"Successfully processed {len(db_samples)} DB samples and {len(eval_samples)} EVAL samples.")
+            return db_samples, eval_samples
 
         except Exception as e:
             print(f"Error loading or processing {dataset_name} dataset: {e}")
-            print("Using fallback coding prompts...")
-            fallback_prompts = [ "Write a Python function to implement binary search", "Create a class for a binary tree", "Implement a merge sort algorithm", "Write a function to find the longest palindromic substring", "Create a graph class with DFS and BFS", "Implement a LRU cache", "Write a function to detect cycles in a linked list", "Create a priority queue", "Implement the quicksort algorithm", "Write a function to validate a binary search tree"]
-            actual_fallback_size = min(len(fallback_prompts), config.CODING_DATASET_SIZE)
-            db_samples = [{"prompt": prompt, "category": "coding", "source": "synthetic"} for prompt in fallback_prompts[:actual_fallback_size]]
-            return db_samples
+            print("Using fallback coding prompts from config...")
+            actual_fallback_size = min(len(config.FALLBACK_CODING_PROMPTS), config.CODING_DATASET_SIZE)
+            db_samples = [{"prompt": prompt, "category": "coding", "source": "synthetic"} 
+                         for prompt in config.FALLBACK_CODING_PROMPTS[:actual_fallback_size]]
+            eval_samples = []  # No eval samples for fallback
+            return db_samples, eval_samples
 
-    # <<< MODIFICATION: Function now only returns db_samples (no eval samples yet)
-    def load_math_dataset(self) -> List[Dict[str, Any]]:
-        """Load and prepare math dataset"""
+    def load_math_dataset(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Load and prepare math dataset - returns (db_samples, eval_samples)"""
         print("Loading math dataset...")
         try:
             dataset_list = list(load_dataset("gsm8k", "main", split="train", streaming=False))
@@ -124,39 +138,54 @@ class ExpertiseDBBuilder:
                 raise ValueError("Loaded math (gsm8k) dataset is empty.")
             
             db_size = config.MATH_DATASET_SIZE
-            if len(dataset_list) < db_size:
-                print(f"⚠️ Warning: Dataset has {len(dataset_list)} records, but {db_size} are required for DB. Adjusting sizes.")
+            eval_size = config.EVALUATION_SET_SIZE
+            total_needed = db_size + eval_size
+            
+            if len(dataset_list) < total_needed:
+                print(f"⚠️ Warning: Dataset has {len(dataset_list)} records, but {total_needed} are required. Adjusting sizes.")
                 db_size = min(db_size, len(dataset_list))
+                eval_size = min(eval_size, len(dataset_list) - db_size)
 
-            # --- MODIFICATION: Random sampling from dataset for DB ---
-            print(f"Randomly sampling {db_size} samples for the database...")
+            # Split into DB and EVAL samples with no overlap
+            print(f"Splitting {total_needed} samples: {db_size} for DB, {eval_size} for EVAL (no overlap)...")
             all_indices = list(range(len(dataset_list)))
             random.shuffle(all_indices)
             db_indices = all_indices[:db_size]
+            eval_indices = all_indices[db_size:db_size + eval_size]
+            
             db_records = [dataset_list[i] for i in db_indices]
-            # ---
+            eval_records = [dataset_list[i] for i in eval_indices]
 
             db_samples = []
+            eval_samples = []
             
             for item in tqdm(db_records, desc="Processing math DB samples"):
                 prompt = item.get('question')
                 if prompt and prompt.strip():
                     db_samples.append({"prompt": prompt.strip(), "category": "math", "source": "gsm8k"})
+            
+            for item in tqdm(eval_records, desc="Processing math EVAL samples"):
+                prompt = item.get('question')
+                if prompt and prompt.strip():
+                    eval_samples.append({
+                        "query": prompt.strip(),
+                        "category": "math"
+                    })
 
-            print(f"Successfully processed {len(db_samples)} DB samples.")
-            return db_samples
+            print(f"Successfully processed {len(db_samples)} DB samples and {len(eval_samples)} EVAL samples.")
+            return db_samples, eval_samples
 
         except Exception as e:
             print(f"Error loading or processing math dataset: {e}")
-            print("Using fallback math prompts...")
-            fallback_prompts = ["Solve for x: 2x + 5 = 15", "What is the derivative of x^3?", "Calculate the area of a circle with radius 7", "Find the prime factorization of 84", "Solve the quadratic equation x^2 - 5x + 6 = 0", "What is the integral of 3x^2?", "Probability of rolling two dice and getting 7", "Slope of the line passing through (2,3) and (5,9)", "What is 15% of 240?", "Solve the system: 2x + y = 7, x - y = 2"]
-            actual_fallback_size = min(len(fallback_prompts), config.MATH_DATASET_SIZE)
-            db_samples = [{"prompt": prompt, "category": "math", "source": "synthetic"} for prompt in fallback_prompts[:actual_fallback_size]]
-            return db_samples
+            print("Using fallback math prompts from config...")
+            actual_fallback_size = min(len(config.FALLBACK_MATH_PROMPTS), config.MATH_DATASET_SIZE)
+            db_samples = [{"prompt": prompt, "category": "math", "source": "synthetic"} 
+                         for prompt in config.FALLBACK_MATH_PROMPTS[:actual_fallback_size]]
+            eval_samples = []  # No eval samples for fallback
+            return db_samples, eval_samples
 
-    # <<< MODIFICATION: Function now only returns db_samples (no eval samples yet)
-    def load_general_dataset(self) -> List[Dict[str, Any]]:
-        """Load and prepare general knowledge dataset using TriviaQA"""
+    def load_general_dataset(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Load and prepare general knowledge dataset using TriviaQA - returns (db_samples, eval_samples)"""
         print("Loading general knowledge dataset (TriviaQA)...")
         try:
             dataset_list = list(load_dataset("trivia_qa", "rc.nocontext", split="validation", streaming=False))
@@ -164,39 +193,54 @@ class ExpertiseDBBuilder:
                 raise ValueError("Loaded TriviaQA dataset split is empty.")
 
             db_size = config.GENERAL_DATASET_SIZE
-            if len(dataset_list) < db_size:
-                print(f"⚠️ Warning: Dataset has {len(dataset_list)} records, but {db_size} are required. Adjusting sizes.")
-                db_size = min(db_size, len(dataset_list))
+            eval_size = config.EVALUATION_SET_SIZE
+            total_needed = db_size + eval_size
             
-            # --- MODIFICATION: Random sampling from dataset for DB ---
-            print(f"Randomly sampling {db_size} samples for the database...")
+            if len(dataset_list) < total_needed:
+                print(f"⚠️ Warning: Dataset has {len(dataset_list)} records, but {total_needed} are required. Adjusting sizes.")
+                db_size = min(db_size, len(dataset_list))
+                eval_size = min(eval_size, len(dataset_list) - db_size)
+            
+            # Split into DB and EVAL samples with no overlap
+            print(f"Splitting {total_needed} samples: {db_size} for DB, {eval_size} for EVAL (no overlap)...")
             all_indices = list(range(len(dataset_list)))
             random.shuffle(all_indices)
             db_indices = all_indices[:db_size]
+            eval_indices = all_indices[db_size:db_size + eval_size]
+            
             db_records = [dataset_list[i] for i in db_indices]
-            # ---
+            eval_records = [dataset_list[i] for i in eval_indices]
 
             db_samples = []
+            eval_samples = []
 
             for item in tqdm(db_records, desc="Processing general DB samples"):
                 prompt = item.get('question')
                 if prompt and prompt.strip():
                     db_samples.append({"prompt": prompt.strip(), "category": "general_knowledge", "source": "trivia_qa"})
+            
+            for item in tqdm(eval_records, desc="Processing general EVAL samples"):
+                prompt = item.get('question')
+                if prompt and prompt.strip():
+                    eval_samples.append({
+                        "query": prompt.strip(),
+                        "category": "general_knowledge"
+                    })
 
-            print(f"Successfully processed {len(db_samples)} DB samples.")
-            return db_samples
+            print(f"Successfully processed {len(db_samples)} DB samples and {len(eval_samples)} EVAL samples.")
+            return db_samples, eval_samples
 
         except Exception as e:
             print(f"Error loading or processing TriviaQA dataset: {e}")
-            print("Using fallback general knowledge prompts...")
-            fallback_prompts = ["What is the capital of France?", "Explain the theory of relativity", "What are the main causes of climate change?", "Describe photosynthesis", "History of the Internet?", "Explain how vaccines work", "Benefits of renewable energy?", "Describe the structure of an atom", "What is artificial intelligence?", "Explain the water cycle", "Significance of the Renaissance?", "How do economies work?", "What is quantum mechanics?", "Describe the human digestive system", "What is machine learning?", "Explain evolution", "What are human rights?", "Describe the solar system", "What is democracy?", "Explain how the brain works"]
-            actual_fallback_size = min(len(fallback_prompts), config.GENERAL_DATASET_SIZE)
-            db_samples = [{"prompt": prompt, "category": "general_knowledge", "source": "synthetic"} for prompt in fallback_prompts[:actual_fallback_size]]
-            return db_samples
+            print("Using fallback general knowledge prompts from config...")
+            actual_fallback_size = min(len(config.FALLBACK_GENERAL_PROMPTS), config.GENERAL_DATASET_SIZE)
+            db_samples = [{"prompt": prompt, "category": "general_knowledge", "source": "synthetic"} 
+                         for prompt in config.FALLBACK_GENERAL_PROMPTS[:actual_fallback_size]]
+            eval_samples = []  # No eval samples for fallback
+            return db_samples, eval_samples
 
-    # NEW: Load LLM Routing dataset for GENERAL classes
-    def load_llm_routing_general_dataset(self) -> List[Dict[str, Any]]:
-        """Load and prepare general knowledge from LLM Routing dataset with balanced sampling per class"""
+    def load_llm_routing_general_dataset(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Load and prepare general knowledge from LLM Routing dataset with balanced sampling per class - returns (db_samples, eval_samples)"""
         print("Loading LLM Routing dataset for GENERAL classes...")
         
         # Classes to include in general category
@@ -209,8 +253,10 @@ class ExpertiseDBBuilder:
             
             # Calculate samples per class for equal distribution
             db_size = config.GENERAL_DATASET_SIZE
-            samples_per_class = db_size // len(general_classes)
-            print(f"Target: {samples_per_class} samples per class (total {db_size})")
+            eval_size = config.EVALUATION_SET_SIZE
+            samples_per_class_db = db_size // len(general_classes)
+            samples_per_class_eval = eval_size // len(general_classes)
+            print(f"Target: {samples_per_class_db} DB samples per class (total {db_size}), {samples_per_class_eval} EVAL samples per class (total {eval_size})")
             
             # Group samples by class
             print(f"Filtering and grouping samples by class: {general_classes}")
@@ -228,6 +274,7 @@ class ExpertiseDBBuilder:
             
             # Sample equally from each class
             db_samples = []
+            eval_samples = []
             
             for cls in general_classes:
                 available = len(class_samples[cls])
@@ -235,13 +282,16 @@ class ExpertiseDBBuilder:
                     print(f"⚠️ Warning: No samples found for class '{cls}'. Skipping.")
                     continue
                 
-                # Take samples_per_class or all available (whichever is smaller)
-                actual_count = min(samples_per_class, available)
+                # Calculate needed samples
+                actual_db_count = min(samples_per_class_db, available)
+                actual_eval_count = min(samples_per_class_eval, available - actual_db_count)
                 
-                # Random sampling from this class
-                selected_indices = random.sample(range(available), actual_count)
+                # Random sampling with no overlap
+                shuffled_indices = random.sample(range(available), actual_db_count + actual_eval_count)
+                db_indices = shuffled_indices[:actual_db_count]
+                eval_indices = shuffled_indices[actual_db_count:actual_db_count + actual_eval_count]
                 
-                for idx in tqdm(selected_indices, desc=f"Processing {cls} samples"):
+                for idx in tqdm(db_indices, desc=f"Processing {cls} DB samples"):
                     item = class_samples[cls][idx]
                     prompt = item.get('prompt')
                     if prompt and prompt.strip():
@@ -251,19 +301,27 @@ class ExpertiseDBBuilder:
                             "source": f"llm-routing-{cls}"
                         })
                 
-                print(f"✅ Sampled {actual_count} samples from class '{cls}'")
+                for idx in tqdm(eval_indices, desc=f"Processing {cls} EVAL samples"):
+                    item = class_samples[cls][idx]
+                    prompt = item.get('prompt')
+                    if prompt and prompt.strip():
+                        eval_samples.append({
+                            "query": prompt.strip(),
+                            "category": "general_knowledge"
+                        })
+                
+                print(f"✅ Sampled {actual_db_count} DB and {actual_eval_count} EVAL samples from class '{cls}'")
             
-            print(f"Successfully processed {len(db_samples)} DB samples from LLM Routing dataset (balanced).")
-            return db_samples
+            print(f"Successfully processed {len(db_samples)} DB samples and {len(eval_samples)} EVAL samples from LLM Routing dataset (balanced).")
+            return db_samples, eval_samples
             
         except Exception as e:
             print(f"Error loading or processing LLM Routing dataset for general classes: {e}")
             print("Skipping LLM Routing general dataset.")
-            return []
+            return [], []
 
-    # NEW: Load LLM Routing dataset for MATH class
-    def load_llm_routing_math_dataset(self) -> List[Dict[str, Any]]:
-        """Load and prepare math samples from LLM Routing dataset"""
+    def load_llm_routing_math_dataset(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        """Load and prepare math samples from LLM Routing dataset - returns (db_samples, eval_samples)"""
         print("Loading LLM Routing dataset for MATH class...")
         
         try:
@@ -278,34 +336,50 @@ class ExpertiseDBBuilder:
             
             if not filtered_list:
                 print("⚠️ No math samples found. Skipping.")
-                return []
+                return [], []
             
             db_size = config.MATH_DATASET_SIZE
-            if len(filtered_list) < db_size:
-                print(f"⚠️ Warning: Filtered dataset has {len(filtered_list)} records, but {db_size} are required. Adjusting sizes.")
-                db_size = min(db_size, len(filtered_list))
+            eval_size = config.EVALUATION_SET_SIZE
+            total_needed = db_size + eval_size
             
-            # Random sampling from dataset for DB
-            print(f"Randomly sampling {db_size} samples for the database...")
+            if len(filtered_list) < total_needed:
+                print(f"⚠️ Warning: Filtered dataset has {len(filtered_list)} records, but {total_needed} are required. Adjusting sizes.")
+                db_size = min(db_size, len(filtered_list))
+                eval_size = min(eval_size, len(filtered_list) - db_size)
+            
+            # Split into DB and EVAL with no overlap
+            print(f"Splitting {total_needed} samples: {db_size} for DB, {eval_size} for EVAL (no overlap)...")
             all_indices = list(range(len(filtered_list)))
             random.shuffle(all_indices)
             db_indices = all_indices[:db_size]
+            eval_indices = all_indices[db_size:db_size + eval_size]
+            
             db_records = [filtered_list[i] for i in db_indices]
+            eval_records = [filtered_list[i] for i in eval_indices]
             
             db_samples = []
+            eval_samples = []
             
             for item in tqdm(db_records, desc="Processing LLM Routing math DB samples"):
                 prompt = item.get('prompt')
                 if prompt and prompt.strip():
                     db_samples.append({"prompt": prompt.strip(), "category": "math", "source": "llm-routing-dataset"})
             
-            print(f"Successfully processed {len(db_samples)} DB samples from LLM Routing math dataset.")
-            return db_samples
+            for item in tqdm(eval_records, desc="Processing LLM Routing math EVAL samples"):
+                prompt = item.get('prompt')
+                if prompt and prompt.strip():
+                    eval_samples.append({
+                        "query": prompt.strip(),
+                        "category": "math"
+                    })
+            
+            print(f"Successfully processed {len(db_samples)} DB samples and {len(eval_samples)} EVAL samples from LLM Routing math dataset.")
+            return db_samples, eval_samples
             
         except Exception as e:
             print(f"Error loading or processing LLM Routing dataset for math class: {e}")
             print("Skipping LLM Routing math dataset.")
-            return []
+            return [], []
 
     def embed_and_store_samples(self, samples: List[Dict[str, Any]], batch_size: int = 32):
         """Embed samples and store them in ChromaDB"""
@@ -313,11 +387,15 @@ class ExpertiseDBBuilder:
             print("No samples to embed and store.")
             return
         print(f"Embedding and storing {len(samples)} samples...")
-        for i in tqdm(range(0, len(samples), batch_size), desc="Storing embeddings"):
+        for i in range(0, len(samples), batch_size):
             batch = samples[i:i + batch_size]
             prompts = [sample["prompt"] for sample in batch]
             try:
-                embeddings = self.model.encode(prompts, convert_to_numpy=True, show_progress_bar=False)
+                # Use built-in progress bar from SentenceTransformer
+                embeddings = self.model.encode(prompts, convert_to_numpy=True, show_progress_bar=True)
+                # Normalize each embedding vector to unit norm
+                norms = np.linalg.norm(embeddings, axis=1, keepdims=True)
+                embeddings = embeddings / np.clip(norms, 1e-8, None)
             except Exception as e:
                 print(f"\nError encoding batch starting at index {i}: {e}")
                 continue
@@ -350,6 +428,7 @@ class ExpertiseDBBuilder:
 
             # Process datasets ONE AT A TIME (memory efficient!)
             total_db_stored = 0
+            all_eval_samples = []  # Collect eval samples here (no overlap with DB)
             
             # Define dataset processing order
             datasets_to_process = [
@@ -367,21 +446,26 @@ class ExpertiseDBBuilder:
             for dataset_name, load_func in datasets_to_process:
                 print(f"\n[{dataset_name.upper()}] Loading dataset...")
                 
-                # Load dataset (only this one in memory)
-                db_samples = load_func()
+                # Load dataset - now returns (db_samples, eval_samples)
+                db_samples, eval_samples = load_func()
                 
-                print(f"[{dataset_name.upper()}] Loaded {len(db_samples)} DB samples")
+                print(f"[{dataset_name.upper()}] Loaded {len(db_samples)} DB samples and {len(eval_samples)} EVAL samples")
                 
                 # Store DB samples in ChromaDB immediately
                 if db_samples:
-                    print(f"[{dataset_name.upper()}] Embedding and storing in ChromaDB...")
+                    print(f"[{dataset_name.upper()}] Embedding and storing DB samples in ChromaDB...")
                     self.embed_and_store_samples(db_samples)
                     total_db_stored += len(db_samples)
-                    print(f"[{dataset_name.upper()}] ✅ Stored {len(db_samples)} samples in ChromaDB")
+                    print(f"[{dataset_name.upper()}] ✅ Stored {len(db_samples)} DB samples in ChromaDB")
+                
+                # Collect eval samples (these will NEVER be stored in ChromaDB)
+                if eval_samples:
+                    all_eval_samples.extend(eval_samples)
+                    print(f"[{dataset_name.upper()}] ✅ Collected {len(eval_samples)} EVAL samples (NOT in ChromaDB)")
                 
                 # Free memory explicitly
                 print(f"[{dataset_name.upper()}] Clearing from memory...")
-                del db_samples
+                del db_samples, eval_samples
                 gc.collect()  # Force garbage collection
                 print(f"[{dataset_name.upper()}] ✅ Memory cleared\n")
 
@@ -396,53 +480,10 @@ class ExpertiseDBBuilder:
             except Exception as count_e:
                 print(f"Warning: Could not get final count from collection: {count_e}")
 
-            # Combine all evaluation samples from temp files
+            # Prepare evaluation dataset (NO ChromaDB querying!)
             print("\n" + "="*60)
-            print("CREATING EVALUATION DATASET FROM CHROMADB")
+            print("CREATING EVALUATION DATASET (from collected samples, NO DATA LEAKAGE)")
             print("="*60)
-            
-            all_eval_samples = []
-            
-            # For each category, query ChromaDB and randomly pick eval samples
-            categories_eval_count = {
-                "coding": EVALUATION_SET_SIZE,  # 2000 from 6000 coding samples
-                "math": EVALUATION_SET_SIZE,    # 2000 from 6000 math samples  
-                "general_knowledge": EVALUATION_SET_SIZE  # 2000 from 6000 general samples
-            }
-            
-            for category, eval_count in categories_eval_count.items():
-                print(f"\n[{category.upper()}] Querying ChromaDB for samples...")
-                try:
-                    # Query all samples for this category
-                    results = self.collection.get(
-                        where={"category": category},
-                        include=["documents", "metadatas"]
-                    )
-                    
-                    if not results or not results['documents']:
-                        print(f"⚠️ No samples found for category '{category}'. Skipping.")
-                        continue
-                    
-                    category_samples = results['documents']
-                    print(f"Found {len(category_samples)} total samples for '{category}'")
-                    
-                    # Randomly select eval_count samples
-                    actual_eval_count = min(eval_count, len(category_samples))
-                    print(f"Randomly sampling {actual_eval_count} evaluation samples...")
-                    
-                    # Create indices and shuffle
-                    eval_indices = random.sample(range(len(category_samples)), actual_eval_count)
-                    
-                    for idx in eval_indices:
-                        all_eval_samples.append({
-                            "query": category_samples[idx],
-                            "category": category
-                        })
-                    
-                    print(f"✅ Added {actual_eval_count} eval samples for '{category}'")
-                    
-                except Exception as e:
-                    print(f"❌ Error querying ChromaDB for category '{category}': {e}")
             
             if not all_eval_samples:
                 print("⚠️ No evaluation samples were generated. Skipping evaluation file creation.")

@@ -24,7 +24,6 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.naive_bayes import MultinomialNB
 from catboost import CatBoostClassifier
-from sentence_transformers import SentenceTransformer
 import matplotlib.pyplot as plt
 import seaborn as sns
 from collections import Counter
@@ -34,6 +33,7 @@ import warnings
 from semantic_router import SemanticRouter
 from rich.console import Console
 from config import config
+from utils.model_loader import get_sentence_transformer
 
 warnings.filterwarnings('ignore')
 
@@ -111,9 +111,9 @@ class ComprehensiveEvaluator:
     def _initialize_components(self):
         try:
             self.router = SemanticRouter()
-            # Load the same Sentence Transformer model for fair comparison
+            # Use shared singleton model instance for fair comparison
             console.print(f"Loading Sentence Transformer model for baseline: {config.SENTENCE_TRANSFORMER_MODEL}")
-            self.sentence_model = SentenceTransformer(config.SENTENCE_TRANSFORMER_MODEL)
+            self.sentence_model = get_sentence_transformer()
         except Exception as e:
             console.print(f"❌ Failed to initialize components: {e}")
             raise
@@ -146,26 +146,48 @@ class ComprehensiveEvaluator:
 
         for name, model in baselines.items():
             console.print(f"Benchmarking {model.name}...")
-            start_time = time.perf_counter()
+            
+            # TRAIN the model (not included in latency measurement)
             if name.startswith("tfidf_"):
-                # All TF-IDF based models
                 model.fit(X_train_val_vec, self.y_train_val)
-                preds = model.predict(X_test_vec)
             elif name == "sentence_catboost":
-                # Sentence Transformer + CatBoost (same embeddings as Semantic Router!)
                 console.print("  Encoding training data with Sentence Transformer...")
                 X_train_sent = self.sentence_model.encode(self.X_train_val, convert_to_numpy=True, show_progress_bar=False)
+                model.fit(X_train_sent, self.y_train_val)
+            # Rule-based and dummy classifiers don't need training
+            
+            # MEASURE INFERENCE TIME ONLY (fair comparison)
+            inference_latencies = []
+            if name.startswith("tfidf_"):
+                # Measure each prediction individually for fair comparison
+                for test_query in X_test:
+                    test_vec = vectorizer.transform([test_query])
+                    start_time = time.perf_counter()
+                    pred = model.predict(test_vec)
+                    latency = time.perf_counter() - start_time
+                    inference_latencies.append(latency)
+                preds = model.predict(X_test_vec)  # Get all predictions for accuracy
+            elif name == "sentence_catboost":
                 console.print("  Encoding test data with Sentence Transformer...")
                 X_test_sent = self.sentence_model.encode(X_test, convert_to_numpy=True, show_progress_bar=False)
-                model.fit(X_train_sent, self.y_train_val)
-                preds = model.predict(X_test_sent)
+                # Measure each prediction individually
+                for i in range(len(X_test)):
+                    start_time = time.perf_counter()
+                    pred = model.predict(X_test_sent[i:i+1])
+                    latency = time.perf_counter() - start_time
+                    inference_latencies.append(latency)
+                preds = model.predict(X_test_sent)  # Get all predictions for accuracy
             else:
                 # Rule-based and dummy classifiers
-                preds = model.predict(X_test.reshape(-1, 1))
-            latency = time.perf_counter() - start_time
-            avg_latency = (latency / len(X_test)) if len(X_test) > 0 else 0
+                for test_query in X_test:
+                    start_time = time.perf_counter()
+                    pred = model.predict(np.array([test_query]).reshape(-1, 1))
+                    latency = time.perf_counter() - start_time
+                    inference_latencies.append(latency)
+                preds = model.predict(X_test.reshape(-1, 1))  # Get all predictions for accuracy
+            
             all_performances[model.name] = self._calculate_performance_metrics(
-                model.name, y_test, preds, [avg_latency] * len(X_test), X_test
+                model.name, y_test, preds, inference_latencies, X_test
             )
         return all_performances
         
@@ -187,7 +209,6 @@ class ComprehensiveEvaluator:
             "confusion_matrix": confusion_matrix(y_true_flat, y_pred_flat).tolist(),
             "labels": sorted(list(set(y_true_flat) | set(y_pred_flat))),
             "avg_latency_ms": np.mean(latencies) * 1000,
-            "throughput_qps": 1 / np.mean(latencies) if np.mean(latencies) > 0 else float('inf'),
             "routing_decisions": routing_decisions
         }
 
@@ -231,7 +252,7 @@ class ComprehensiveEvaluator:
         dummy_freq.fit(X_data.reshape(-1, 1), y_data)
         dummy_freq.name = "Most Frequent Class"
         
-        # TF-IDF + Various Classifiers
+        # TF-IDF + Various Classifiers (all with random_state for reproducibility)
         svm_classifier = SVC(kernel='rbf', random_state=42)
         svm_classifier.name = "TF-IDF + SVM"
         
@@ -241,7 +262,7 @@ class ComprehensiveEvaluator:
         rf_classifier = RandomForestClassifier(n_estimators=100, random_state=42)
         rf_classifier.name = "TF-IDF + Random Forest"
         
-        nb_classifier = MultinomialNB()
+        nb_classifier = MultinomialNB()  # Note: MultinomialNB is deterministic, no random_state needed
         nb_classifier.name = "TF-IDF + Naive Bayes"
         
         # CatBoost Classifier (handles text features directly)
@@ -293,7 +314,6 @@ class ComprehensiveEvaluator:
             "TF-IDF + CatBoost": [],
             "Sentence Transformer + CatBoost": []
         }
-        vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
         for fold, (train_idx, val_idx) in enumerate(kf.split(X)):
             console.print(f"Running Cross-Validation Fold {fold+1}/{k_folds}...")
             X_train, X_val, y_train, y_val = X[train_idx], X[val_idx], y[train_idx], y[val_idx]
@@ -307,6 +327,8 @@ class ComprehensiveEvaluator:
                 val_preds_sr.append(predicted_category)
             ss_ger_fold_accuracies.append(accuracy_score(y_val, val_preds_sr))
             baselines = self._get_baseline_models(X_train, y_train)
+            # Fit vectorizer only on training data to prevent data leakage
+            vectorizer = TfidfVectorizer(max_features=1000, stop_words='english')
             X_train_vec = vectorizer.fit_transform(X_train)
             X_val_vec = vectorizer.transform(X_val)
             for name, model in baselines.items():
@@ -583,9 +605,9 @@ class ComprehensiveEvaluator:
             f.write("# Comprehensive Evaluation Report\n\n")
             f.write(f"**Date**: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n")
             f.write("## 1. Overall Performance Comparison\n\n")
-            f.write("| Model | Accuracy | Avg Latency (ms) | Throughput (q/s) |\n|---|---|---|---|\n")
+            f.write("| Model | Accuracy | Avg Latency (ms) |\n|---|---|---|\n")
             for name, data in sorted(performances.items(), key=lambda item: item[1]['accuracy'], reverse=True):
-                f.write(f"| **{name}** | **{data['accuracy']:.3f}** | {data['avg_latency_ms']:.3f} | {data['throughput_qps']:.2f} |\n")
+                f.write(f"| **{name}** | **{data['accuracy']:.3f}** | {data['avg_latency_ms']:.3f} |\n")
             f.write("\n")
             if performances and list(performances.values())[0]['labels']:
                 f.write("## 2. Per-Category Performance (F1-Score)\n\n")

@@ -1,7 +1,7 @@
 import os
 import numpy as np
 from typing import Dict, List, Optional, Tuple, Any
-from sentence_transformers import SentenceTransformer
+from collections import OrderedDict
 import chromadb
 from chromadb.config import Settings
 import time
@@ -10,6 +10,7 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from config import config
+from utils.model_loader import get_sentence_transformer
 
 
 class SemanticRouterError(Exception):
@@ -26,7 +27,7 @@ class SemanticRouter:
         self.model = None
         self.client = None
         self.collection = None
-        self.cache = {}  
+        self.cache = OrderedDict()  # LRU cache using OrderedDict
         
         self._initialize_components()
     
@@ -35,8 +36,9 @@ class SemanticRouter:
             # Initialize seeds for reproducibility
             config.initialize_seeds()
             
+            # Use shared singleton model instance
             print(f"Loading sentence transformer model: {self.model_name}")
-            self.model = SentenceTransformer(self.model_name)
+            self.model = get_sentence_transformer()
             
             # Verify database exists
             if not os.path.exists(self.db_path):
@@ -74,15 +76,22 @@ class SemanticRouter:
             raise SemanticRouterError(f"Failed to initialize router components: {e}")
     
     def _embed_prompt(self, prompt: str) -> np.ndarray:
-
+        """Embed prompt and normalize to unit norm (consistent with database)"""
         try:
             embedding = self.model.encode([prompt], convert_to_numpy=True)
-            return embedding[0]  # Return single embedding vector
+            embedding = embedding[0]  # Get single embedding vector
+            
+            # Normalize to unit norm (consistent with database storage)
+            norm = np.linalg.norm(embedding)
+            if norm > 1e-8:
+                embedding = embedding / norm
+            
+            return embedding
         except Exception as e:
             raise SemanticRouterError(f"Failed to embed prompt: {e}")
     
     def _check_cache(self, prompt: str, embedding: np.ndarray) -> Optional[str]:
-       
+        """Check if a similar prompt exists in cache (with LRU update)"""
         for cached_prompt, cached_data in self.cache.items():
             cached_embedding = cached_data["embedding"]
             
@@ -91,18 +100,19 @@ class SemanticRouter:
             
             if similarity >= config.CACHE_SIMILARITY_THRESHOLD:
                 print(f"🎯 Cache hit! Similarity: {similarity:.4f} with: '{cached_prompt[:50]}...'")
+                # Move to end (most recently used) to maintain LRU order
+                self.cache.move_to_end(cached_prompt)
                 return cached_data["category"]
         
         return None
     
     def _update_cache(self, prompt: str, embedding: np.ndarray, category: str):
-       
-        # Simple cache management: keep only the most recent 100 entries
-        if len(self.cache) >= 100:
-            # Remove oldest entry
-            oldest_key = next(iter(self.cache))
-            del self.cache[oldest_key]
+        """Update cache with LRU eviction policy using OrderedDict"""
+        # Remove oldest entry if cache is full (LRU eviction)
+        if len(self.cache) >= config.CACHE_SIZE:
+            self.cache.popitem(last=False)  # Remove oldest (first) item
         
+        # Add new entry (will be at the end, most recent)
         self.cache[prompt] = {
             "embedding": embedding,
             "category": category,
@@ -124,13 +134,12 @@ class SemanticRouter:
             
             # Get the closest match
             closest_metadata = results['metadatas'][0][0]
-            closest_distance = results['distances'][0][0]  # ChromaDB returns L2 distance
+            closest_distance = results['distances'][0][0]  # ChromaDB returns cosine distance
             closest_document = results['documents'][0][0]
-            
-            # Convert L2 distance to cosine similarity approximation
-            # For normalized vectors: cosine_similarity ≈ 1 - (L2_distance^2 / 2)
-            # This is an approximation, but works well for routing decisions
-            similarity_score = max(0, 1 - (closest_distance ** 2 / 2))
+            # Convert cosine distance to cosine similarity
+            # ChromaDB with cosine space returns: distance = 1 - cosine_similarity
+            # Therefore: similarity = 1 - distance
+            similarity_score = 1 - closest_distance
             
             category = closest_metadata['category']
             

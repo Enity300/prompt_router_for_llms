@@ -1,5 +1,5 @@
 import os
-from typing import Optional
+from typing import Optional, List
 from dotenv import load_dotenv
 
 # Load environment variables from .env file if it exists
@@ -23,9 +23,11 @@ class Config:
     CODING_DATASET_SIZE: int = int(os.getenv("CODING_DATASET_SIZE", "6000"))
     MATH_DATASET_SIZE: int = int(os.getenv("MATH_DATASET_SIZE", "3000"))
     GENERAL_DATASET_SIZE: int = int(os.getenv("GENERAL_DATASET_SIZE", "3000"))
+    EVALUATION_SET_SIZE: int = int(os.getenv("EVALUATION_SET_SIZE", "2000"))
     
     # Routing Configuration - Enhanced for Larger Dataset
     TOP_K_NEIGHBORS: int = int(os.getenv("TOP_K_NEIGHBORS", "3"))
+    CACHE_SIZE: int = int(os.getenv("CACHE_SIZE", "100"))
     CACHE_SIMILARITY_THRESHOLD: float = float(os.getenv("CACHE_SIMILARITY_THRESHOLD", "0.95"))
     
     # Reproducibility Configuration
@@ -33,6 +35,56 @@ class Config:
     NUMPY_SEED: int = int(os.getenv("NUMPY_SEED", "42"))
     TORCH_SEED: int = int(os.getenv("TORCH_SEED", "42"))
     ENABLE_REPRODUCIBILITY: bool = os.getenv("ENABLE_REPRODUCIBILITY", "true").lower() == "true"
+    
+    # Fallback Prompts (used when dataset loading fails)
+    FALLBACK_CODING_PROMPTS: List[str] = [
+        "Write a Python function to implement binary search",
+        "Create a class for a binary tree",
+        "Implement a merge sort algorithm",
+        "Write a function to find the longest palindromic substring",
+        "Create a graph class with DFS and BFS",
+        "Implement a LRU cache",
+        "Write a function to detect cycles in a linked list",
+        "Create a priority queue",
+        "Implement the quicksort algorithm",
+        "Write a function to validate a binary search tree"
+    ]
+    
+    FALLBACK_MATH_PROMPTS: List[str] = [
+        "Solve for x: 2x + 5 = 15",
+        "What is the derivative of x^3?",
+        "Calculate the area of a circle with radius 7",
+        "Find the prime factorization of 84",
+        "Solve the quadratic equation x^2 - 5x + 6 = 0",
+        "What is the integral of 3x^2?",
+        "Probability of rolling two dice and getting 7",
+        "Slope of the line passing through (2,3) and (5,9)",
+        "What is 15% of 240?",
+        "Solve the system: 2x + y = 7, x - y = 2"
+    ]
+    
+    FALLBACK_GENERAL_PROMPTS: List[str] = [
+        "What is the capital of France?",
+        "Explain the theory of relativity",
+        "What are the main causes of climate change?",
+        "Describe photosynthesis",
+        "History of the Internet?",
+        "Explain how vaccines work",
+        "Benefits of renewable energy?",
+        "Describe the structure of an atom",
+        "What is artificial intelligence?",
+        "Explain the water cycle",
+        "Significance of the Renaissance?",
+        "How do economies work?",
+        "What is quantum mechanics?",
+        "Describe the human digestive system",
+        "What is machine learning?",
+        "Explain evolution",
+        "What are human rights?",
+        "Describe the solar system",
+        "What is democracy?",
+        "Explain how the brain works"
+    ]
     
     
     # Local Ollama Models Configuration
