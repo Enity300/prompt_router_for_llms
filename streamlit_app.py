@@ -16,6 +16,7 @@ try:
         sys.path.append(PROJECT_ROOT)
 
     from src.semantic_router import SemanticRouter, SemanticRouterError
+    from src.sentence_transformer_catboost_router import SentenceTransformerCatBoostRouter
     from src.specialist_clients import query_specialist, LLMClientError
     try:
         from config import config
@@ -32,7 +33,6 @@ except Exception as e:
     st.error(traceback.format_exc())
     st.stop()
 
-# /////////////////////////////////////////////////////////////
 st.set_page_config(
     page_title="Router",
     page_icon="🎯",
@@ -40,7 +40,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# /////////////////////////////////////////////////////////////
 st.markdown("""
 <style>
     .main-header {
@@ -48,47 +47,47 @@ st.markdown("""
         font-weight: bold;
         text-align: center;
         /* Optional: Simplified gradient or solid color */
-        color: #1f77b4;
-        /* background: linear-gradient(90deg, #1f77b4, #ff7f0e);
+        color:
+        /* background: linear-gradient(90deg,
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent; */
         margin-bottom: 2rem;
     }
     /* .metric-card can be removed if not used */
     .success-box {
-        background-color: #d4edda;
-        border: 1px solid #c3e6cb;
+        background-color:
+        border: 1px solid
         border-radius: 0.5rem;
         padding: 1rem;
         margin: 1rem 0;
-        color: #155724; /* Ensure text is readable */
+        color:
     }
     .error-box {
-        background-color: #f8d7da;
-        border: 1px solid #f5c6cb;
+        background-color:
+        border: 1px solid
         border-radius: 0.5rem;
         padding: 1rem;
         margin: 1rem 0;
-        color: #721c24; /* Ensure text is readable */
+        color:
     }
     .info-box {
-        background-color: #d1ecf1;
-        border: 1px solid #bee5eb;
+        background-color:
+        border: 1px solid
         border-radius: 0.5rem;
         padding: 1rem;
         margin: 1rem 0;
-        color: #0c5460; /* Ensure text is readable */
+        color:
     }
     /* Ensure code blocks are readable */
     pre {
-        background-color: #f0f2f6;
+        background-color:
         padding: 1rem;
         border-radius: 0.5rem;
         overflow-x: auto; /* Allow horizontal scroll for long code */
-        color: #333; /* Default text color */
+        color:
     }
     code {
-         color: #333; /* Ensure inline code is also readable */
+         color:
     }
 
 </style>
@@ -99,7 +98,9 @@ if 'router' not in st.session_state:
 if 'routing_history' not in st.session_state:
     st.session_state.routing_history = []
 if 'router_initialized' not in st.session_state:
-     st.session_state.router_initialized = False 
+     st.session_state.router_initialized = False
+if 'model_type' not in st.session_state:
+     st.session_state.model_type = "Semantic Router (k-NN)"
 
 
 def display_header():
@@ -115,13 +116,25 @@ def display_header():
 def initialize_router():
     if not st.session_state.router_initialized and st.session_state.router is None:
         try:
-            with st.spinner("Initializing SS-GER Router... This may take a moment."):
+            model_type = st.session_state.model_type
+            with st.spinner(f"Initializing {model_type}... This may take a moment."):
                 time.sleep(0.5)
                 if config:
-                    st.session_state.router = SemanticRouter()
-                    st.session_state.router_initialized = True 
-                    st.success("✅ Router initialized successfully!")
-                    time.sleep(1) 
+                    if model_type == "Semantic Router (k-NN)":
+                        st.session_state.router = SemanticRouter()
+                        st.success("✅ Semantic Router (k-NN) initialized successfully!")
+                    elif model_type == "Sentence Transformer + CatBoost":
+                        router = SentenceTransformerCatBoostRouter()
+                        if not router.is_trained:
+                            st.error("❌ Sentence Transformer + CatBoost model not trained!")
+                            st.error("Please train the model first: `python src/sentence_transformer_catboost_router.py`")
+                            st.session_state.router_initialized = False
+                            return False
+                        st.session_state.router = router
+                        st.success("✅ Sentence Transformer + CatBoost Router initialized successfully!")
+
+                    st.session_state.router_initialized = True
+                    time.sleep(1)
                     return True
                 else:
                     st.error("❌ Configuration not loaded. Cannot initialize router.")
@@ -129,17 +142,17 @@ def initialize_router():
         except SemanticRouterError as e:
             st.error(f"❌ Failed to initialize router: {e}")
             st.error("Please ensure the expertise database exists and is accessible (check CHROMADB_PATH in config). You might need to build it first.")
-            st.session_state.router_initialized = False 
+            st.session_state.router_initialized = False
             return False
-        except Exception as e: 
+        except Exception as e:
              st.error(f"❌ An unexpected error occurred during router initialization: {e}")
-             st.error(traceback.format_exc()) 
+             st.error(traceback.format_exc())
              st.session_state.router_initialized = False
              return False
     elif st.session_state.router is not None:
-         st.session_state.router_initialized = True 
+         st.session_state.router_initialized = True
          return True
-    else: 
+    else:
          return False
 
 
@@ -148,10 +161,10 @@ def routing_interface():
         if not initialize_router():
              st.warning("Router initialization failed. Routing is unavailable.")
              if st.button("Retry Initialization"):
-                  st.session_state.router = None 
+                  st.session_state.router = None
                   st.session_state.router_initialized = False
                   st.rerun()
-             return 
+             return
 
     st.subheader("🎯 Enter Prompt")
 
@@ -161,10 +174,10 @@ def routing_interface():
         placeholder="e.g., Explain the concept of recursion in Python with an example."
     )
 
-    col1, col2 = st.columns([3, 1]) 
-   
+    col1, col2 = st.columns([3, 1])
+
     with col2:
-        st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True) 
+        st.markdown("<div style='margin-top: 30px;'></div>", unsafe_allow_html=True)
         submit_button = st.button("🚀 Route ", type="primary", key="route_button", use_container_width=True)
 
     if submit_button:
@@ -194,20 +207,21 @@ def routing_interface():
 
                 st.write("🗣️ Querying specialist model...")
                 response_result = query_specialist(
-                    routing_result.get('category', 'general_knowledge'), 
-                    prompt, 
+                    routing_result.get('category', 'general_knowledge'),
+                    prompt,
                 )
                 st.write("✅ Received response.")
 
-            MAX_HISTORY_SIZE = 50 
+            MAX_HISTORY_SIZE = 50
             routing_entry = {
                 'timestamp': datetime.now(),
                 'prompt': prompt,
                 'routing': routing_result,
-                'response': response_result
+                'response': response_result,
+                'model_type': st.session_state.model_type
             }
             st.session_state.routing_history.insert(0, routing_entry)
-            st.session_state.routing_history = st.session_state.routing_history[:MAX_HISTORY_SIZE] 
+            st.session_state.routing_history = st.session_state.routing_history[:MAX_HISTORY_SIZE]
 
             result_placeholder.empty()
             response_placeholder.empty()
@@ -219,10 +233,16 @@ def routing_interface():
              st.error(f"LLM Client Error: {llme}")
         except Exception as e:
             st.error(f"An unexpected error occurred during routing: {e}")
-            st.error(traceback.format_exc()) 
+            st.error(traceback.format_exc())
 
 def display_routing_results(routing_result: Dict, response_result: Dict, prompt: str):
     st.markdown("---")
+
+    model_badge = f"**Router Model:** `{st.session_state.model_type}`"
+    if st.session_state.model_type == "Sentence Transformer + CatBoost":
+        model_badge += " ⭐"
+    st.markdown(model_badge)
+
     st.subheader("📊 Routing Decision")
 
     col1, col2, col3, col4 = st.columns(4)
@@ -259,7 +279,7 @@ def display_routing_results(routing_result: Dict, response_result: Dict, prompt:
         st.metric("Response Time", f"{response_result.get('response_time', 0):.3f}s")
 
     st.markdown("**Response:**")
-    response_text = response_result.get('response', 'No response received.').strip() 
+    response_text = response_result.get('response', 'No response received.').strip()
     success = response_result.get('success', False)
     category = routing_result.get('category', 'general_knowledge')
 
@@ -268,7 +288,7 @@ def display_routing_results(routing_result: Dict, response_result: Dict, prompt:
     if success:
         if category == "math":
             try:
-                
+
                 st.latex(response_text)
             except Exception as latex_error:
                 st.warning(f"Could not render response as LaTeX: {latex_error}")
@@ -295,24 +315,27 @@ def routing_history_interface():
 
     history_data = []
 
-    for i, entry in enumerate(st.session_state.routing_history): 
+    for i, entry in enumerate(st.session_state.routing_history):
         routing_info = entry.get('routing', {})
         response_info = entry.get('response', {})
+        model_used = entry.get('model_type', 'N/A')
+        model_display = "k-NN" if "k-NN" in model_used else "CatBoost" if "CatBoost" in model_used else model_used
         history_data.append({
             'Timestamp': entry.get('timestamp', datetime.min).strftime('%Y-%m-%d %H:%M:%S'),
-            'Prompt': entry.get('prompt', 'N/A')[:100] + ("..." if len(entry.get('prompt', 'N/A')) > 100 else ""),
+            'Model': model_display,
+            'Prompt': entry.get('prompt', 'N/A')[:80] + ("..." if len(entry.get('prompt', 'N/A')) > 80 else ""),
             'Routed Category': routing_info.get('category', 'N/A'),
             'Confidence': f"{routing_info.get('confidence', 0):.3f}",
             'Route Time (s)': f"{routing_info.get('routing_time', 0):.3f}",
             'Cache Hit': "Yes" if routing_info.get('from_cache', False) else "No",
             'Specialist': response_info.get('specialist', 'N/A'),
-            'Resp. Time (s)': f"{response_info.get('response_time', 0):.3f}", 
+            'Resp. Time (s)': f"{response_info.get('response_time', 0):.3f}",
             'Success': "✅" if response_info.get('success', False) else "❌ Error"
         })
 
     df = pd.DataFrame(history_data)
 
-    st.dataframe(df, use_container_width=True, height=400) 
+    st.dataframe(df, use_container_width=True, height=400)
 
     if not df.empty:
          options = list(range(len(df)))
@@ -324,13 +347,13 @@ def routing_history_interface():
          selected_index = st.selectbox(
              "View full details for entry:",
              options=options,
-             format_func=format_hist_option,    
-             index=None, 
+             format_func=format_hist_option,
+             index=None,
              placeholder="Select an entry..."
              )
          if selected_index is not None:
-             
-             history_actual_index = selected_index 
+
+             history_actual_index = selected_index
              with st.expander(f"Details for Entry at Index {selected_index}", expanded=True):
                   st.markdown("**Prompt:**")
                   st.text(st.session_state.routing_history[history_actual_index]['prompt'])
@@ -347,11 +370,49 @@ def routing_history_interface():
 def main():
     display_header()
 
+    st.sidebar.title("⚙️ Model Selection")
+
+    model_options = [
+        "Semantic Router (k-NN)",
+        "Sentence Transformer + CatBoost"
+    ]
+
+    selected_model = st.sidebar.selectbox(
+        "Choose Router Model:",
+        options=model_options,
+        index=model_options.index(st.session_state.model_type),
+        help="Select the routing model to use for categorizing prompts"
+    )
+
+    if selected_model != st.session_state.model_type:
+        st.session_state.model_type = selected_model
+        st.session_state.router = None
+        st.session_state.router_initialized = False
+        st.rerun()
+
+    if st.session_state.model_type == "Semantic Router (k-NN)":
+        st.sidebar.info("""
+        **k-NN Based Routing**
+        - Uses nearest neighbor voting
+        - Fast inference (~20-40ms)
+        - Accuracy: ~66-78%
+        - No training required
+        """)
+    else:
+        st.sidebar.info("""
+        **CatBoost Classifier**
+        - Uses trained decision boundaries
+        - Faster inference (~2-5ms)
+        - Accuracy: ~85-95% ⭐
+        - Requires pre-training
+        """)
+
+    st.sidebar.markdown("---")
     st.sidebar.title("📄 Navigation")
-    page = st.sidebar.radio( 
+    page = st.sidebar.radio(
         "Select Page",
         [
-            "🎯 Prompt Routing", 
+            "🎯 Prompt Routing",
             "📚 History"
         ],
         key="page_selector"

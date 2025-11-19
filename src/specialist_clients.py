@@ -14,33 +14,30 @@ class LLMClientError(Exception):
 
 
 def _query_ollama_model(model_name: str, prompt: str, specialist_name: str, category: str, system_prompt: str = None) -> Dict[str, Any]:
-   
+
     if not config.USE_LOCAL_MODELS:
         return None
-        
-    # GPU monitoring integration
+
     gpu_metrics_before = None
     gpu_metrics_after = None
-    
+
     try:
-        # Try to get GPU metrics before inference
         try:
             from .gpu_monitor import get_gpu_monitor
             gpu_monitor = get_gpu_monitor()
             gpu_metrics_before = gpu_monitor.get_current_metrics()
         except ImportError:
-            pass  # GPU monitoring not available
+            pass
         except Exception:
-            pass  # Ignore GPU monitoring errors
-        
+            pass
+
         start_time = time.time()
-        
-        # Prepare the request payload for Ollama API
+
         messages = []
         if system_prompt:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
-        
+
         payload = {
             "model": model_name,
             "messages": messages,
@@ -50,30 +47,26 @@ def _query_ollama_model(model_name: str, prompt: str, specialist_name: str, cate
                 "num_predict": 1000
             }
         }
-        
-        # Make request to local Ollama server
+
         response = requests.post(
             f"{config.OLLAMA_BASE_URL}/api/chat",
             json=payload,
             timeout=config.OLLAMA_TIMEOUT
         )
         response.raise_for_status()
-        
+
         data = response.json()
         response_time = time.time() - start_time
-        
-        # Get GPU metrics after inference
+
         try:
             if gpu_metrics_before is not None:
                 gpu_metrics_after = gpu_monitor.get_current_metrics()
         except Exception:
-            pass  # Ignore GPU monitoring errors
-        
-        # Calculate GPU usage statistics if available
+            pass
+
         gpu_stats = None
         if gpu_metrics_before and gpu_metrics_after:
             try:
-                # Calculate GPU utilization changes during inference
                 gpu_stats = {}
                 for before, after in zip(gpu_metrics_before, gpu_metrics_after):
                     if before.gpu_id == after.gpu_id:
@@ -94,8 +87,8 @@ def _query_ollama_model(model_name: str, prompt: str, specialist_name: str, cate
                             gpu_stats[f"gpu_{before.gpu_id}"]["power_after"] = after.power_watts
                             gpu_stats[f"gpu_{before.gpu_id}"]["power_delta"] = after.power_watts - before.power_watts
             except Exception:
-                pass  # Ignore GPU stats calculation errors
-        
+                pass
+
         return {
             "specialist": f"{specialist_name} (Local)",
             "category": category,
@@ -111,7 +104,7 @@ def _query_ollama_model(model_name: str, prompt: str, specialist_name: str, cate
                 "inference_duration": response_time
             }
         }
-        
+
     except requests.exceptions.ConnectionError:
         print(f"⚠️ Ollama server not running - falling back to API/mock for {specialist_name}")
         return None
@@ -123,7 +116,7 @@ def _query_ollama_model(model_name: str, prompt: str, specialist_name: str, cate
 def _check_ollama_available() -> bool:
     if not config.USE_LOCAL_MODELS:
         return False
-        
+
     try:
         response = requests.get(f"{config.OLLAMA_BASE_URL}/api/tags", timeout=5)
         return response.status_code == 200
@@ -132,8 +125,7 @@ def _check_ollama_available() -> bool:
 
 
 def query_deepseek_coder(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
-   
-    # Try local Ollama model first
+
     if config.USE_LOCAL_MODELS:
         local_result = _query_ollama_model(
             model_name=config.LOCAL_CODING_MODEL,
@@ -144,8 +136,7 @@ def query_deepseek_coder(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
         )
         if local_result:
             return local_result
-    
-    # Fallback to API or mock
+
     if not config.DEEPSEEK_API_KEY:
         return {
             "specialist": "DeepSeek Coder (API Key Required)",
@@ -156,12 +147,12 @@ def query_deepseek_coder(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
             "success": False,
             "error": "API key not configured"
         }
-    
+
     headers = {
         "Authorization": f"Bearer {config.DEEPSEEK_API_KEY}",
         "Content-Type": "application/json"
     }
-    
+
     payload = {
         "model": "deepseek-coder",
         "messages": [
@@ -171,7 +162,7 @@ def query_deepseek_coder(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
         "max_tokens": max_tokens,
         "temperature": 0.1
     }
-    
+
     try:
         response = requests.post(
             f"{config.DEEPSEEK_API_BASE}/chat/completions",
@@ -180,7 +171,7 @@ def query_deepseek_coder(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
             timeout=30
         )
         response.raise_for_status()
-        
+
         data = response.json()
         return {
             "specialist": "DeepSeek Coder",
@@ -190,7 +181,7 @@ def query_deepseek_coder(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
             "model": "deepseek-coder",
             "success": True
         }
-        
+
     except requests.exceptions.RequestException as e:
         raise LLMClientError(f"DeepSeek API error: {e}")
     except (KeyError, IndexError) as e:
@@ -198,7 +189,6 @@ def query_deepseek_coder(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
 
 
 def query_wizardmath(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
-    # Try local Ollama model first
     if config.USE_LOCAL_MODELS:
         local_result = _query_ollama_model(
             model_name=config.LOCAL_MATH_MODEL,
@@ -209,8 +199,7 @@ def query_wizardmath(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
         )
         if local_result:
             return local_result
-    
-    # Fallback to API or mock
+
     if not config.WIZARDMATH_API_KEY:
         return {
         "specialist": "WizardMath (API Key Required)",
@@ -221,12 +210,12 @@ def query_wizardmath(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
         "success": False,
         "error": "API key not configured"
     }
-    
+
     headers = {
         "Authorization": f"Bearer {config.WIZARDMATH_API_KEY}",
         "Content-Type": "application/json"
     }
-    
+
     payload = {
         "model": "wizardmath-70b",
         "messages": [
@@ -236,7 +225,7 @@ def query_wizardmath(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
         "max_tokens": max_tokens,
         "temperature": 0.1
     }
-    
+
     try:
         response = requests.post(
             f"{config.WIZARDMATH_API_BASE}/chat/completions",
@@ -245,17 +234,17 @@ def query_wizardmath(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
             timeout=30
         )
         response.raise_for_status()
-        
+
         data = response.json()
         return {
             "specialist": "WizardMath",
-            "category": "math", 
+            "category": "math",
             "response": data["choices"][0]["message"]["content"],
             "tokens_used": data.get("usage", {}).get("total_tokens", 0),
             "model": "wizardmath-70b",
             "success": True
         }
-        
+
     except requests.exceptions.RequestException as e:
         raise LLMClientError(f"WizardMath API error: {e}")
     except (KeyError, IndexError) as e:
@@ -263,7 +252,6 @@ def query_wizardmath(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
 
 
 def query_openai_gpt4(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
-    # Try local Ollama model first
     if config.USE_LOCAL_MODELS:
         local_result = _query_ollama_model(
             model_name=config.LOCAL_GENERAL_MODEL,
@@ -274,8 +262,7 @@ def query_openai_gpt4(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
         )
         if local_result:
             return local_result
-    
-    # Fallback to API or mock
+
     if not config.OPENAI_API_KEY:
         return {
         "specialist": "OpenAI GPT-4 (API Key Required)",
@@ -286,12 +273,12 @@ def query_openai_gpt4(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
         "success": False,
         "error": "API key not configured"
     }
-    
+
     headers = {
         "Authorization": f"Bearer {config.OPENAI_API_KEY}",
         "Content-Type": "application/json"
     }
-    
+
     payload = {
         "model": "gpt-4",
         "messages": [
@@ -301,7 +288,7 @@ def query_openai_gpt4(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
         "max_tokens": max_tokens,
         "temperature": 0.7
     }
-    
+
     try:
         response = requests.post(
             f"{config.OPENAI_API_BASE}/chat/completions",
@@ -310,7 +297,7 @@ def query_openai_gpt4(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
             timeout=30
         )
         response.raise_for_status()
-        
+
         data = response.json()
         return {
             "specialist": "OpenAI GPT-4",
@@ -320,7 +307,7 @@ def query_openai_gpt4(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
             "model": "gpt-4",
             "success": True
         }
-        
+
     except requests.exceptions.RequestException as e:
         raise LLMClientError(f"OpenAI API error: {e}")
     except (KeyError, IndexError) as e:
@@ -328,7 +315,6 @@ def query_openai_gpt4(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
 
 
 def query_default_model(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
-    # Try local fallback model first (Phi3:mini)
     if config.USE_LOCAL_MODELS:
         local_result = _query_ollama_model(
             model_name=config.LOCAL_FALLBACK_MODEL,
@@ -339,12 +325,10 @@ def query_default_model(prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
         )
         if local_result:
             return local_result
-    
-    # Fallback to OpenAI GPT-4 (which has its own local model logic)
+
     return query_openai_gpt4(prompt, max_tokens)
 
 
-# Mapping of categories to their respective specialist functions
 SPECIALIST_FUNCTIONS = {
     "coding": query_deepseek_coder,
     "math": query_wizardmath,
@@ -359,13 +343,13 @@ def get_specialist_function(category: str):
 def query_specialist(category: str, prompt: str, max_tokens: int = 1000) -> Dict[str, Any]:
 
     specialist_func = get_specialist_function(category)
-    
+
     start_time = time.time()
     try:
         result = specialist_func(prompt, max_tokens)
         result["response_time"] = time.time() - start_time
         return result
-        
+
     except LLMClientError as e:
         return {
             "specialist": f"Error ({category})",

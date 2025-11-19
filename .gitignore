@@ -25,7 +25,6 @@ ENV/
 # Project Specific
 data/db/
 data/db_backup/
-evaluation_dataset.json
 temp_eval_*.json
 
 # Environment Variables

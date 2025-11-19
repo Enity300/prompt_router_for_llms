@@ -1,0 +1,897 @@
+{
+  "final_performance": {
+    "Semantic Router": {
+      "accuracy": 0.6626464507236389,
+      "avg_latency_ms": 67.08488900710744,
+      "labels": [
+        "coding",
+        "general_knowledge",
+        "math"
+      ],
+      "confusion_matrix": [
+        [
+          646,
+          537,
+          0
+        ],
+        [
+          0,
+          1099,
+          1
+        ],
+        [
+          0,
+          441,
+          178
+        ]
+      ],
+      "classification_report": {
+        "coding": {
+          "precision": 1.0,
+          "recall": 0.5460693153000845,
+          "f1-score": 0.7063969382176053,
+          "support": 1183.0
+        },
+        "general_knowledge": {
+          "precision": 0.529128550794415,
+          "recall": 0.9990909090909091,
+          "f1-score": 0.6918476550204595,
+          "support": 1100.0
+        },
+        "math": {
+          "precision": 0.994413407821229,
+          "recall": 0.2875605815831987,
+          "f1-score": 0.44611528822055135,
+          "support": 619.0
+        },
+        "accuracy": 0.6626464507236389,
+        "macro avg": {
+          "precision": 0.8411806528718814,
+          "recall": 0.6109069353247308,
+          "f1-score": 0.614786627152872,
+          "support": 2902.0
+        },
+        "weighted avg": {
+          "precision": 0.8203250535200542,
+          "recall": 0.6626464507236389,
+          "f1-score": 0.6453636670718311,
+          "support": 2902.0
+        }
+      }
+    },
+    "Sentence Transformer + CatBoost Router": {
+      "accuracy": 0.9786354238456237,
+      "avg_latency_ms": 35.967775086381586,
+      "labels": [
+        "coding",
+        "general_knowledge",
+        "math"
+      ],
+      "confusion_matrix": [
+        [
+          1165,
+          16,
+          2
+        ],
+        [
+          3,
+          1084,
+          13
+        ],
+        [
+          8,
+          20,
+          591
+        ]
+      ],
+      "classification_report": {
+        "coding": {
+          "precision": 0.9906462585034014,
+          "recall": 0.9847844463229078,
+          "f1-score": 0.9877066553624417,
+          "support": 1183.0
+        },
+        "general_knowledge": {
+          "precision": 0.9678571428571429,
+          "recall": 0.9854545454545455,
+          "f1-score": 0.9765765765765766,
+          "support": 1100.0
+        },
+        "math": {
+          "precision": 0.9752475247524752,
+          "recall": 0.9547657512116317,
+          "f1-score": 0.9648979591836735,
+          "support": 619.0
+        },
+        "accuracy": 0.9786354238456237,
+        "macro avg": {
+          "precision": 0.9779169753710065,
+          "recall": 0.9750015809963616,
+          "f1-score": 0.9763937303742306,
+          "support": 2902.0
+        },
+        "weighted avg": {
+          "precision": 0.9787235006113587,
+          "recall": 0.9786354238456237,
+          "f1-score": 0.9786226892703986,
+          "support": 2902.0
+        }
+      }
+    },
+    "Random Classifier": {
+      "accuracy": 0.32529290144727774,
+      "avg_latency_ms": 0.1385352513874829,
+      "labels": [
+        "coding",
+        "general_knowledge",
+        "math"
+      ],
+      "confusion_matrix": [
+        [
+          394,
+          411,
+          378
+        ],
+        [
+          394,
+          354,
+          352
+        ],
+        [
+          215,
+          208,
+          196
+        ]
+      ],
+      "classification_report": {
+        "coding": {
+          "precision": 0.39282153539381853,
+          "recall": 0.3330515638207946,
+          "f1-score": 0.3604757548032937,
+          "support": 1183.0
+        },
+        "general_knowledge": {
+          "precision": 0.36382322713257964,
+          "recall": 0.32181818181818184,
+          "f1-score": 0.341534008683068,
+          "support": 1100.0
+        },
+        "math": {
+          "precision": 0.21166306695464362,
+          "recall": 0.3166397415185784,
+          "f1-score": 0.2537216828478964,
+          "support": 619.0
+        },
+        "accuracy": 0.32529290144727774,
+        "macro avg": {
+          "precision": 0.3227692764936806,
+          "recall": 0.323836495719185,
+          "f1-score": 0.318577148778086,
+          "support": 2902.0
+        },
+        "weighted avg": {
+          "precision": 0.3431884440598378,
+          "recall": 0.32529290144727774,
+          "f1-score": 0.33052513754876606,
+          "support": 2902.0
+        }
+      }
+    },
+    "Most Frequent Class": {
+      "accuracy": 0.4076498966230186,
+      "avg_latency_ms": 0.1300580624555482,
+      "labels": [
+        "coding",
+        "general_knowledge",
+        "math"
+      ],
+      "confusion_matrix": [
+        [
+          1183,
+          0,
+          0
+        ],
+        [
+          1100,
+          0,
+          0
+        ],
+        [
+          619,
+          0,
+          0
+        ]
+      ],
+      "classification_report": {
+        "coding": {
+          "precision": 0.4076498966230186,
+          "recall": 1.0,
+          "f1-score": 0.5791921664626682,
+          "support": 1183.0
+        },
+        "general_knowledge": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 1100.0
+        },
+        "math": {
+          "precision": 0.0,
+          "recall": 0.0,
+          "f1-score": 0.0,
+          "support": 619.0
+        },
+        "accuracy": 0.4076498966230186,
+        "macro avg": {
+          "precision": 0.13588329887433953,
+          "recall": 0.3333333333333333,
+          "f1-score": 0.1930640554875561,
+          "support": 2902.0
+        },
+        "weighted avg": {
+          "precision": 0.16617843821675776,
+          "recall": 0.4076498966230186,
+          "f1-score": 0.2361076267833689,
+          "support": 2902.0
+        }
+      }
+    },
+    "Rule-based Keywords": {
+      "accuracy": 0.770158511371468,
+      "avg_latency_ms": 0.01922977323577111,
+      "labels": [
+        "coding",
+        "general_knowledge",
+        "math"
+      ],
+      "confusion_matrix": [
+        [
+          993,
+          104,
+          86
+        ],
+        [
+          136,
+          887,
+          77
+        ],
+        [
+          55,
+          209,
+          355
+        ]
+      ],
+      "classification_report": {
+        "coding": {
+          "precision": 0.8386824324324325,
+          "recall": 0.8393913778529163,
+          "f1-score": 0.8390367553865653,
+          "support": 1183.0
+        },
+        "general_knowledge": {
+          "precision": 0.7391666666666666,
+          "recall": 0.8063636363636364,
+          "f1-score": 0.7713043478260869,
+          "support": 1100.0
+        },
+        "math": {
+          "precision": 0.6853281853281853,
+          "recall": 0.5735056542810986,
+          "f1-score": 0.6244503078276166,
+          "support": 619.0
+        },
+        "accuracy": 0.770158511371468,
+        "macro avg": {
+          "precision": 0.7543924281424282,
+          "recall": 0.7397535561658838,
+          "f1-score": 0.7449304703467563,
+          "support": 2902.0
+        },
+        "weighted avg": {
+          "precision": 0.7682504471464672,
+          "recall": 0.770158511371468,
+          "f1-score": 0.767591317979427,
+          "support": 2902.0
+        }
+      }
+    },
+    "TF-IDF + SVM": {
+      "accuracy": 0.9586492074431426,
+      "avg_latency_ms": 0.6633057201818418,
+      "labels": [
+        "coding",
+        "general_knowledge",
+        "math"
+      ],
+      "confusion_matrix": [
+        [
+          1162,
+          10,
+          11
+        ],
+        [
+          11,
+          1062,
+          27
+        ],
+        [
+          0,
+          61,
+          558
+        ]
+      ],
+      "classification_report": {
+        "coding": {
+          "precision": 0.9906223358908781,
+          "recall": 0.9822485207100592,
+          "f1-score": 0.9864176570458404,
+          "support": 1183.0
+        },
+        "general_knowledge": {
+          "precision": 0.9373345101500441,
+          "recall": 0.9654545454545455,
+          "f1-score": 0.9511867442901926,
+          "support": 1100.0
+        },
+        "math": {
+          "precision": 0.9362416107382551,
+          "recall": 0.901453957996769,
+          "f1-score": 0.9185185185185185,
+          "support": 619.0
+        },
+        "accuracy": 0.9586492074431426,
+        "macro avg": {
+          "precision": 0.9547328189263924,
+          "recall": 0.9497190080537913,
+          "f1-score": 0.9520409732848506,
+          "support": 2902.0
+        },
+        "weighted avg": {
+          "precision": 0.9588241700795788,
+          "recall": 0.9586492074431426,
+          "f1-score": 0.9585804514015864,
+          "support": 2902.0
+        }
+      }
+    },
+    "TF-IDF + Logistic Regression": {
+      "accuracy": 0.957960027567195,
+      "avg_latency_ms": 0.2784613718037692,
+      "labels": [
+        "coding",
+        "general_knowledge",
+        "math"
+      ],
+      "confusion_matrix": [
+        [
+          1160,
+          16,
+          7
+        ],
+        [
+          10,
+          1074,
+          16
+        ],
+        [
+          1,
+          72,
+          546
+        ]
+      ],
+      "classification_report": {
+        "coding": {
+          "precision": 0.9906063193851409,
+          "recall": 0.9805579036348268,
+          "f1-score": 0.9855564995751912,
+          "support": 1183.0
+        },
+        "general_knowledge": {
+          "precision": 0.9242685025817556,
+          "recall": 0.9763636363636363,
+          "f1-score": 0.9496021220159151,
+          "support": 1100.0
+        },
+        "math": {
+          "precision": 0.9595782073813708,
+          "recall": 0.8820678513731826,
+          "f1-score": 0.9191919191919192,
+          "support": 619.0
+        },
+        "accuracy": 0.957960027567195,
+        "macro avg": {
+          "precision": 0.9581510097827558,
+          "recall": 0.946329797123882,
+          "f1-score": 0.9514501802610086,
+          "support": 2902.0
+        },
+        "weighted avg": {
+          "precision": 0.9588427081466648,
+          "recall": 0.957960027567195,
+          "f1-score": 0.9577723884199709,
+          "support": 2902.0
+        }
+      }
+    },
+    "TF-IDF + Random Forest": {
+      "accuracy": 0.9627842866988284,
+      "avg_latency_ms": 2.4585223980655546,
+      "labels": [
+        "coding",
+        "general_knowledge",
+        "math"
+      ],
+      "confusion_matrix": [
+        [
+          1172,
+          7,
+          4
+        ],
+        [
+          4,
+          1068,
+          28
+        ],
+        [
+          1,
+          64,
+          554
+        ]
+      ],
+      "classification_report": {
+        "coding": {
+          "precision": 0.9957519116397621,
+          "recall": 0.9907016060862215,
+          "f1-score": 0.9932203389830508,
+          "support": 1183.0
+        },
+        "general_knowledge": {
+          "precision": 0.9376646180860404,
+          "recall": 0.9709090909090909,
+          "f1-score": 0.9539973202322466,
+          "support": 1100.0
+        },
+        "math": {
+          "precision": 0.9453924914675768,
+          "recall": 0.8949919224555735,
+          "f1-score": 0.9195020746887966,
+          "support": 619.0
+        },
+        "accuracy": 0.9627842866988284,
+        "macro avg": {
+          "precision": 0.9596030070644598,
+          "recall": 0.9522008731502952,
+          "f1-score": 0.9555732446346981,
+          "support": 2902.0
+        },
+        "weighted avg": {
+          "precision": 0.9629922617446289,
+          "recall": 0.9627842866988284,
+          "f1-score": 0.9626287034820075,
+          "support": 2902.0
+        }
+      }
+    },
+    "TF-IDF + Naive Bayes": {
+      "accuracy": 0.8452791178497587,
+      "avg_latency_ms": 0.31255075821879585,
+      "labels": [
+        "coding",
+        "general_knowledge",
+        "math"
+      ],
+      "confusion_matrix": [
+        [
+          1166,
+          13,
+          4
+        ],
+        [
+          295,
+          779,
+          26
+        ],
+        [
+          44,
+          67,
+          508
+        ]
+      ],
+      "classification_report": {
+        "coding": {
+          "precision": 0.774750830564784,
+          "recall": 0.9856297548605241,
+          "f1-score": 0.8675595238095238,
+          "support": 1183.0
+        },
+        "general_knowledge": {
+          "precision": 0.9068684516880093,
+          "recall": 0.7081818181818181,
+          "f1-score": 0.7953037263910159,
+          "support": 1100.0
+        },
+        "math": {
+          "precision": 0.9442379182156134,
+          "recall": 0.8206785137318255,
+          "f1-score": 0.878133102852204,
+          "support": 619.0
+        },
+        "accuracy": 0.8452791178497587,
+        "macro avg": {
+          "precision": 0.8752857334894689,
+          "recall": 0.8381633622580559,
+          "f1-score": 0.8469987843509146,
+          "support": 2902.0
+        },
+        "weighted avg": {
+          "precision": 0.8609816680876687,
+          "recall": 0.8452791178497587,
+          "f1-score": 0.8424263977816329,
+          "support": 2902.0
+        }
+      }
+    },
+    "TF-IDF + CatBoost": {
+      "accuracy": 0.9297036526533425,
+      "avg_latency_ms": 1.6020638525024182,
+      "labels": [
+        "coding",
+        "general_knowledge",
+        "math"
+      ],
+      "confusion_matrix": [
+        [
+          1157,
+          22,
+          4
+        ],
+        [
+          3,
+          1090,
+          7
+        ],
+        [
+          2,
+          166,
+          451
+        ]
+      ],
+      "classification_report": {
+        "coding": {
+          "precision": 0.995697074010327,
+          "recall": 0.978021978021978,
+          "f1-score": 0.9867803837953092,
+          "support": 1183.0
+        },
+        "general_knowledge": {
+          "precision": 0.8528951486697965,
+          "recall": 0.990909090909091,
+          "f1-score": 0.9167367535744323,
+          "support": 1100.0
+        },
+        "math": {
+          "precision": 0.9761904761904762,
+          "recall": 0.72859450726979,
+          "f1-score": 0.8344125809435707,
+          "support": 619.0
+        },
+        "accuracy": 0.9297036526533425,
+        "macro avg": {
+          "precision": 0.9415942329568666,
+          "recall": 0.899175192066953,
+          "f1-score": 0.9126432394377707,
+          "support": 2902.0
+        },
+        "weighted avg": {
+          "precision": 0.9374073765861122,
+          "recall": 0.9297036526533425,
+          "f1-score": 0.9277301897194337,
+          "support": 2902.0
+        }
+      }
+    }
+  },
+  "token_length_analysis": {
+    "Semantic Router": {
+      "results": [
+        {
+          "token_range": "1-5",
+          "sample_count": 62,
+          "accuracy": 0.9354838709677419
+        },
+        {
+          "token_range": "6-10",
+          "sample_count": 398,
+          "accuracy": 0.9673366834170855
+        },
+        {
+          "token_range": "11-20",
+          "sample_count": 462,
+          "accuracy": 0.9285714285714286
+        },
+        {
+          "token_range": "21-50",
+          "sample_count": 591,
+          "accuracy": 0.5516074450084603
+        },
+        {
+          "token_range": "51+",
+          "sample_count": 1387,
+          "accuracy": 0.5212689257390051
+        }
+      ],
+      "model_name": "Semantic Router"
+    },
+    "Sentence Transformer + CatBoost Router": {
+      "results": [
+        {
+          "token_range": "1-5",
+          "sample_count": 62,
+          "accuracy": 0.9516129032258065
+        },
+        {
+          "token_range": "6-10",
+          "sample_count": 398,
+          "accuracy": 0.9798994974874372
+        },
+        {
+          "token_range": "11-20",
+          "sample_count": 462,
+          "accuracy": 0.9718614718614719
+        },
+        {
+          "token_range": "21-50",
+          "sample_count": 591,
+          "accuracy": 0.9526226734348562
+        },
+        {
+          "token_range": "51+",
+          "sample_count": 1387,
+          "accuracy": 0.992790194664744
+        }
+      ],
+      "model_name": "Sentence Transformer + CatBoost Router"
+    },
+    "Random Classifier": {
+      "results": [
+        {
+          "token_range": "1-5",
+          "sample_count": 62,
+          "accuracy": 0.2903225806451613
+        },
+        {
+          "token_range": "6-10",
+          "sample_count": 398,
+          "accuracy": 0.2964824120603015
+        },
+        {
+          "token_range": "11-20",
+          "sample_count": 462,
+          "accuracy": 0.3268398268398268
+        },
+        {
+          "token_range": "21-50",
+          "sample_count": 591,
+          "accuracy": 0.3350253807106599
+        },
+        {
+          "token_range": "51+",
+          "sample_count": 1387,
+          "accuracy": 0.3302090843547224
+        }
+      ],
+      "model_name": "Random Classifier"
+    },
+    "Most Frequent Class": {
+      "results": [
+        {
+          "token_range": "1-5",
+          "sample_count": 62,
+          "accuracy": 0.0
+        },
+        {
+          "token_range": "6-10",
+          "sample_count": 398,
+          "accuracy": 0.010050251256281407
+        },
+        {
+          "token_range": "11-20",
+          "sample_count": 462,
+          "accuracy": 0.07142857142857142
+        },
+        {
+          "token_range": "21-50",
+          "sample_count": 591,
+          "accuracy": 0.25380710659898476
+        },
+        {
+          "token_range": "51+",
+          "sample_count": 1387,
+          "accuracy": 0.7180966113914924
+        }
+      ],
+      "model_name": "Most Frequent Class"
+    },
+    "Rule-based Keywords": {
+      "results": [
+        {
+          "token_range": "1-5",
+          "sample_count": 62,
+          "accuracy": 0.9354838709677419
+        },
+        {
+          "token_range": "6-10",
+          "sample_count": 398,
+          "accuracy": 0.914572864321608
+        },
+        {
+          "token_range": "11-20",
+          "sample_count": 462,
+          "accuracy": 0.8441558441558441
+        },
+        {
+          "token_range": "21-50",
+          "sample_count": 591,
+          "accuracy": 0.637901861252115
+        },
+        {
+          "token_range": "51+",
+          "sample_count": 1387,
+          "accuracy": 0.7541456380677721
+        }
+      ],
+      "model_name": "Rule-based Keywords"
+    },
+    "TF-IDF + SVM": {
+      "results": [
+        {
+          "token_range": "1-5",
+          "sample_count": 62,
+          "accuracy": 0.9838709677419355
+        },
+        {
+          "token_range": "6-10",
+          "sample_count": 398,
+          "accuracy": 0.9547738693467337
+        },
+        {
+          "token_range": "11-20",
+          "sample_count": 462,
+          "accuracy": 0.9372294372294372
+        },
+        {
+          "token_range": "21-50",
+          "sample_count": 591,
+          "accuracy": 0.9255499153976311
+        },
+        {
+          "token_range": "51+",
+          "sample_count": 1387,
+          "accuracy": 0.9798125450612833
+        }
+      ],
+      "model_name": "TF-IDF + SVM"
+    },
+    "TF-IDF + Logistic Regression": {
+      "results": [
+        {
+          "token_range": "1-5",
+          "sample_count": 62,
+          "accuracy": 0.9354838709677419
+        },
+        {
+          "token_range": "6-10",
+          "sample_count": 398,
+          "accuracy": 0.9597989949748744
+        },
+        {
+          "token_range": "11-20",
+          "sample_count": 462,
+          "accuracy": 0.9458874458874459
+        },
+        {
+          "token_range": "21-50",
+          "sample_count": 591,
+          "accuracy": 0.9187817258883249
+        },
+        {
+          "token_range": "51+",
+          "sample_count": 1387,
+          "accuracy": 0.9790915645277577
+        }
+      ],
+      "model_name": "TF-IDF + Logistic Regression"
+    },
+    "TF-IDF + Random Forest": {
+      "results": [
+        {
+          "token_range": "1-5",
+          "sample_count": 62,
+          "accuracy": 0.9193548387096774
+        },
+        {
+          "token_range": "6-10",
+          "sample_count": 398,
+          "accuracy": 0.9597989949748744
+        },
+        {
+          "token_range": "11-20",
+          "sample_count": 462,
+          "accuracy": 0.9567099567099567
+        },
+        {
+          "token_range": "21-50",
+          "sample_count": 591,
+          "accuracy": 0.9170896785109983
+        },
+        {
+          "token_range": "51+",
+          "sample_count": 1387,
+          "accuracy": 0.9870223503965393
+        }
+      ],
+      "model_name": "TF-IDF + Random Forest"
+    },
+    "TF-IDF + Naive Bayes": {
+      "results": [
+        {
+          "token_range": "1-5",
+          "sample_count": 62,
+          "accuracy": 0.4032258064516129
+        },
+        {
+          "token_range": "6-10",
+          "sample_count": 398,
+          "accuracy": 0.592964824120603
+        },
+        {
+          "token_range": "11-20",
+          "sample_count": 462,
+          "accuracy": 0.7272727272727273
+        },
+        {
+          "token_range": "21-50",
+          "sample_count": 591,
+          "accuracy": 0.8527918781725888
+        },
+        {
+          "token_range": "51+",
+          "sample_count": 1387,
+          "accuracy": 0.9733237202595529
+        }
+      ],
+      "model_name": "TF-IDF + Naive Bayes"
+    },
+    "TF-IDF + CatBoost": {
+      "results": [
+        {
+          "token_range": "1-5",
+          "sample_count": 62,
+          "accuracy": 0.9354838709677419
+        },
+        {
+          "token_range": "6-10",
+          "sample_count": 398,
+          "accuracy": 0.9422110552763819
+        },
+        {
+          "token_range": "11-20",
+          "sample_count": 462,
+          "accuracy": 0.9393939393939394
+        },
+        {
+          "token_range": "21-50",
+          "sample_count": 591,
+          "accuracy": 0.8358714043993232
+        },
+        {
+          "token_range": "51+",
+          "sample_count": 1387,
+          "accuracy": 0.9625090122566691
+        }
+      ],
+      "model_name": "TF-IDF + CatBoost"
+    }
+  },
+  "timestamp": "2025-11-17 08:38:04"
+}

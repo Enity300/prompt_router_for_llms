@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 
 import subprocess
 import sys
@@ -9,9 +8,8 @@ def main():
     print("Starting Streamlit Interface...")
     print("URL: http://localhost:8501")
     print("-" * 50)
-    
+
     try:
-        # Run streamlit
         subprocess.run([
             sys.executable, "-m", "streamlit", "run", "streamlit_app.py",
             "--server.port", "8501",

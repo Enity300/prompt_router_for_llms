@@ -1,50 +1,50 @@
 # Comprehensive Evaluation Report
 
-**Date**: 2025-11-09 20:36:55
+**Date**: 2025-11-17 08:38:04
 
 ## 1. Overall Performance Comparison
 
-| Model | Accuracy | Avg Latency (ms) | Inference Speed (q/s) |
-|---|---|---|---|
-| **Semantic Router** | **1.000** | 45.802 | 21.83 |
-| **Sentence Transformer + CatBoost** | **0.965** | 0.737 | 1356.42 |
-| **TF-IDF + Random Forest** | **0.962** | 1.932 | 517.68 |
-| **TF-IDF + Logistic Regression** | **0.955** | 0.050 | 19971.52 |
-| **TF-IDF + SVM** | **0.949** | 0.379 | 2637.76 |
-| **TF-IDF + CatBoost** | **0.928** | 1.243 | 804.56 |
-| **TF-IDF + Naive Bayes** | **0.856** | 0.047 | 21100.42 |
-| **Rule-based Keywords** | **0.681** | 0.022 | 45646.29 |
-| **Random Classifier** | **0.352** | 0.144 | 6960.85 |
-| **Most Frequent Class** | **0.333** | 0.165 | 6054.93 |
+| Model | Accuracy | Avg Latency (ms) |
+|---|---|---|
+| **Sentence Transformer + CatBoost Router** | **0.979** | 35.968 |
+| **TF-IDF + Random Forest** | **0.963** | 2.459 |
+| **TF-IDF + SVM** | **0.959** | 0.663 |
+| **TF-IDF + Logistic Regression** | **0.958** | 0.278 |
+| **TF-IDF + CatBoost** | **0.930** | 1.602 |
+| **TF-IDF + Naive Bayes** | **0.845** | 0.313 |
+| **Rule-based Keywords** | **0.770** | 0.019 |
+| **Semantic Router** | **0.663** | 67.085 |
+| **Most Frequent Class** | **0.408** | 0.130 |
+| **Random Classifier** | **0.325** | 0.139 |
 
 ## 2. Per-Category Performance (F1-Score)
 
 | Model | coding | general_knowledge | math |
 |---| --- | --- | --- |
-| Semantic Router | 1.000 | 1.000 | 1.000 |
-| Random Classifier | 0.358 | 0.356 | 0.343 |
-| Most Frequent Class | 0.500 | 0.000 | 0.000 |
-| Rule-based Keywords | 0.790 | 0.717 | 0.465 |
-| TF-IDF + SVM | 0.981 | 0.937 | 0.929 |
-| TF-IDF + Logistic Regression | 0.978 | 0.948 | 0.938 |
-| TF-IDF + Random Forest | 0.992 | 0.949 | 0.946 |
-| TF-IDF + Naive Bayes | 0.864 | 0.776 | 0.915 |
-| TF-IDF + CatBoost | 0.985 | 0.908 | 0.889 |
-| Sentence Transformer + CatBoost | 0.979 | 0.960 | 0.957 |
+| Semantic Router | 0.706 | 0.692 | 0.446 |
+| Sentence Transformer + CatBoost Router | 0.988 | 0.977 | 0.965 |
+| Random Classifier | 0.360 | 0.342 | 0.254 |
+| Most Frequent Class | 0.579 | 0.000 | 0.000 |
+| Rule-based Keywords | 0.839 | 0.771 | 0.624 |
+| TF-IDF + SVM | 0.986 | 0.951 | 0.919 |
+| TF-IDF + Logistic Regression | 0.986 | 0.950 | 0.919 |
+| TF-IDF + Random Forest | 0.993 | 0.954 | 0.920 |
+| TF-IDF + Naive Bayes | 0.868 | 0.795 | 0.878 |
+| TF-IDF + CatBoost | 0.987 | 0.917 | 0.834 |
 
-## 3. Statistical Significance (vs Semantic Router)
+## 3. Statistical Significance (vs Sentence Transformer + CatBoost Router)
 
-| Comparison vs Baseline | t-statistic | p-value | Significant (p < 0.05) |
+| Comparison | t-statistic | p-value | Significant (p < 0.05) |
 |---|---|---|---|
-| Semantic Router vs Random Classifier | 88.753 | 0.0000 | ✅ Yes |
-| Semantic Router vs Most Frequent Class | 141.502 | 0.0000 | ✅ Yes |
-| Semantic Router vs Rule-based Keywords | 38.627 | 0.0000 | ✅ Yes |
-| Semantic Router vs TF-IDF + SVM | 18.326 | 0.0001 | ✅ Yes |
-| Semantic Router vs TF-IDF + Logistic Regression | 23.341 | 0.0000 | ✅ Yes |
-| Semantic Router vs TF-IDF + Random Forest | 11.642 | 0.0003 | ✅ Yes |
-| Semantic Router vs TF-IDF + Naive Bayes | 15.019 | 0.0001 | ✅ Yes |
-| Semantic Router vs TF-IDF + CatBoost | 12.780 | 0.0002 | ✅ Yes |
-| Semantic Router vs Sentence Transformer + CatBoost | 8.835 | 0.0009 | ✅ Yes |
+| Sentence Transformer + CatBoost Router vs Semantic Router | 37.615 | 0.0000 | ✅ Yes |
+| Sentence Transformer + CatBoost Router vs Random Classifier | 87.860 | 0.0000 | ✅ Yes |
+| Sentence Transformer + CatBoost Router vs Most Frequent Class | 86.075 | 0.0000 | ✅ Yes |
+| Sentence Transformer + CatBoost Router vs Rule-based Keywords | 56.492 | 0.0000 | ✅ Yes |
+| Sentence Transformer + CatBoost Router vs TF-IDF + SVM | 5.127 | 0.0069 | ✅ Yes |
+| Sentence Transformer + CatBoost Router vs TF-IDF + Logistic Regression | 5.785 | 0.0044 | ✅ Yes |
+| Sentence Transformer + CatBoost Router vs TF-IDF + Random Forest | 2.622 | 0.0587 | ❌ No |
+| Sentence Transformer + CatBoost Router vs TF-IDF + Naive Bayes | 17.282 | 0.0001 | ✅ Yes |
+| Sentence Transformer + CatBoost Router vs TF-IDF + CatBoost | 10.137 | 0.0005 | ✅ Yes |
 
 ## 4. Token Length Impact Analysis
 
@@ -52,69 +52,99 @@
 
 | Token Range | Sample Count | Accuracy |
 |---|---|---|
-| 1-5 | 38 | 100.00% |
-| 6-10 | 286 | 100.00% |
-| 11-20 | 355 | 100.00% |
-| 21-50 | 685 | 100.00% |
-| 51+ | 1035 | 100.00% |
+| 1-5 | 62 | 93.55% |
+| 6-10 | 398 | 96.73% |
+| 11-20 | 462 | 92.86% |
+| 21-50 | 591 | 55.16% |
+| 51+ | 1387 | 52.13% |
+
+### Sentence Transformer + CatBoost Router
+
+| Token Range | Sample Count | Accuracy |
+|---|---|---|
+| 1-5 | 62 | 95.16% |
+| 6-10 | 398 | 97.99% |
+| 11-20 | 462 | 97.19% |
+| 21-50 | 591 | 95.26% |
+| 51+ | 1387 | 99.28% |
+
+### Random Classifier
+
+| Token Range | Sample Count | Accuracy |
+|---|---|---|
+| 1-5 | 62 | 29.03% |
+| 6-10 | 398 | 29.65% |
+| 11-20 | 462 | 32.68% |
+| 21-50 | 591 | 33.50% |
+| 51+ | 1387 | 33.02% |
+
+### Most Frequent Class
+
+| Token Range | Sample Count | Accuracy |
+|---|---|---|
+| 1-5 | 62 | 0.00% |
+| 6-10 | 398 | 1.01% |
+| 11-20 | 462 | 7.14% |
+| 21-50 | 591 | 25.38% |
+| 51+ | 1387 | 71.81% |
 
 ### Rule-based Keywords
 
 | Token Range | Sample Count | Accuracy |
 |---|---|---|
-| 1-5 | 38 | 100.00% |
-| 6-10 | 286 | 91.26% |
-| 11-20 | 355 | 82.82% |
-| 21-50 | 685 | 47.59% |
-| 51+ | 1035 | 69.18% |
+| 1-5 | 62 | 93.55% |
+| 6-10 | 398 | 91.46% |
+| 11-20 | 462 | 84.42% |
+| 21-50 | 591 | 63.79% |
+| 51+ | 1387 | 75.41% |
 
 ### TF-IDF + SVM
 
 | Token Range | Sample Count | Accuracy |
 |---|---|---|
-| 1-5 | 38 | 97.37% |
-| 6-10 | 286 | 96.50% |
-| 11-20 | 355 | 89.86% |
-| 21-50 | 685 | 92.99% |
-| 51+ | 1035 | 97.29% |
+| 1-5 | 62 | 98.39% |
+| 6-10 | 398 | 95.48% |
+| 11-20 | 462 | 93.72% |
+| 21-50 | 591 | 92.55% |
+| 51+ | 1387 | 97.98% |
 
 ### TF-IDF + Logistic Regression
 
 | Token Range | Sample Count | Accuracy |
 |---|---|---|
-| 1-5 | 38 | 97.37% |
-| 6-10 | 286 | 97.20% |
-| 11-20 | 355 | 94.37% |
-| 21-50 | 685 | 92.85% |
-| 51+ | 1035 | 97.00% |
+| 1-5 | 62 | 93.55% |
+| 6-10 | 398 | 95.98% |
+| 11-20 | 462 | 94.59% |
+| 21-50 | 591 | 91.88% |
+| 51+ | 1387 | 97.91% |
 
 ### TF-IDF + Random Forest
 
 | Token Range | Sample Count | Accuracy |
 |---|---|---|
-| 1-5 | 38 | 100.00% |
-| 6-10 | 286 | 96.50% |
-| 11-20 | 355 | 92.96% |
-| 21-50 | 685 | 94.45% |
-| 51+ | 1035 | 98.26% |
+| 1-5 | 62 | 91.94% |
+| 6-10 | 398 | 95.98% |
+| 11-20 | 462 | 95.67% |
+| 21-50 | 591 | 91.71% |
+| 51+ | 1387 | 98.70% |
+
+### TF-IDF + Naive Bayes
+
+| Token Range | Sample Count | Accuracy |
+|---|---|---|
+| 1-5 | 62 | 40.32% |
+| 6-10 | 398 | 59.30% |
+| 11-20 | 462 | 72.73% |
+| 21-50 | 591 | 85.28% |
+| 51+ | 1387 | 97.33% |
 
 ### TF-IDF + CatBoost
 
 | Token Range | Sample Count | Accuracy |
 |---|---|---|
-| 1-5 | 38 | 100.00% |
-| 6-10 | 286 | 96.15% |
-| 11-20 | 355 | 92.11% |
-| 21-50 | 685 | 86.72% |
-| 51+ | 1035 | 95.85% |
-
-### Sentence Transformer + CatBoost
-
-| Token Range | Sample Count | Accuracy |
-|---|---|---|
-| 1-5 | 38 | 100.00% |
-| 6-10 | 286 | 97.55% |
-| 11-20 | 355 | 94.37% |
-| 21-50 | 685 | 95.77% |
-| 51+ | 1035 | 97.39% |
+| 1-5 | 62 | 93.55% |
+| 6-10 | 398 | 94.22% |
+| 11-20 | 462 | 93.94% |
+| 21-50 | 591 | 83.59% |
+| 51+ | 1387 | 96.25% |
 

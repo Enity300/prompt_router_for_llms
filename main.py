@@ -33,7 +33,7 @@ def display_banner():
 
 
 def format_routing_result(routing_result: dict, response_result: dict = None):
-    
+
     routing_info = f"""
 [bold]Category:[/bold] {routing_result['category']}
 [bold]Confidence:[/bold] {routing_result['confidence']:.4f}
@@ -41,14 +41,14 @@ def format_routing_result(routing_result: dict, response_result: dict = None):
 [bold]Routing Time:[/bold] {routing_result['routing_time']:.3f}s
 [bold]From Cache:[/bold] {'Yes' if routing_result.get('from_cache', False) else 'No'}
 """
-    
+
     if 'routing_info' in routing_result:
         info = routing_result['routing_info']
         routing_info += f"\n[bold]Similarity Score:[/bold] {info['similarity_score']:.4f}"
         routing_info += f"\n[bold]Closest Example:[/bold] '{info['closest_example'][:100]}...'"
-    
+
     console.print(Panel(routing_info, title="🎯 Routing Decision", border_style="green"))
-    
+
     if response_result:
         specialist_info = f"""
 [bold]Specialist:[/bold] {response_result['specialist']}
@@ -57,13 +57,12 @@ def format_routing_result(routing_result: dict, response_result: dict = None):
 [bold]Tokens Used:[/bold] {response_result.get('tokens_used', 0)}
 [bold]Success:[/bold] {'Yes' if response_result.get('success', False) else 'No'}
 """
-        
+
         if response_result.get('is_mock', False):
             specialist_info += "\n[yellow]⚠️ Using mock response (API keys not configured)[/yellow]"
-        
+
         console.print(Panel(specialist_info, title="🤖 Specialist Info", border_style="blue"))
-        
-        # Display the actual response
+
         response_text = response_result['response']
         console.print(Panel(response_text, title="💬 Response", border_style="cyan"))
 
@@ -79,7 +78,7 @@ def route(
         if output_format == "rich":
             display_banner()
             console.print(f"\n[bold]Input Prompt:[/bold] {prompt}\n")
-        
+
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -88,38 +87,38 @@ def route(
         ) as progress:
             if output_format == "rich":
                 task = progress.add_task("Initializing router...", total=None)
-            
+
             router = SemanticRouter()
-            
+
             if output_format == "rich":
                 progress.update(task, description="Routing prompt...")
-            
+
             routing_result = router.route(prompt)
-            
+
             if output_format == "rich":
                 progress.update(task, description="Querying specialist...")
-            
+
             response_result = query_specialist(
                 routing_result['category'],
                 prompt,
                 max_tokens=1000
             )
-        
+
         if output_format == "json":
             output = {
                 "routing": routing_result,
                 "response": response_result
             }
             console.print(json.dumps(output, indent=2))
-            
+
         elif output_format == "plain":
             console.print(f"Category: {routing_result['category']}")
             console.print(f"Specialist: {response_result['specialist']}")
             console.print(f"Response: {response_result['response']}")
-            
-        else: 
+
+        else:
             format_routing_result(routing_result, response_result)
-        
+
     except SemanticRouterError as e:
         console.print(f"❌ Router Error: {e}", style="bold red")
         sys.exit(1)
@@ -136,25 +135,25 @@ def interactive():
 
     display_banner()
     console.print("\n[bold green]Interactive Mode[/bold green] - Type 'exit' to quit\n")
-    
+
     try:
         with console.status("Initializing router..."):
             router = SemanticRouter()
-        
+
         console.print("✅ Router initialized! Ready for prompts.\n")
-        
+
         while True:
             try:
                 prompt = Prompt.ask("\n[bold blue]Enter your prompt[/bold blue]")
-                
+
                 if prompt.lower() in ['exit', 'quit', 'q']:
                     console.print("\n👋 Goodbye!")
                     break
-                
+
                 if not prompt.strip():
                     console.print("⚠️ Please enter a non-empty prompt")
                     continue
-                
+
                 with console.status("Processing..."):
                     routing_result = router.route(prompt)
                     response_result = query_specialist(
@@ -162,15 +161,15 @@ def interactive():
                         prompt,
                         max_tokens=1000
                     )
-                
+
                 format_routing_result(routing_result, response_result)
-                
+
             except KeyboardInterrupt:
                 console.print("\n\n👋 Goodbye!")
                 break
             except Exception as e:
                 console.print(f"❌ Error: {e}", style="bold red")
-                
+
     except SemanticRouterError as e:
         console.print(f"❌ Failed to initialize router: {e}", style="bold red")
         sys.exit(1)
@@ -181,56 +180,52 @@ def test():
 
     display_banner()
     console.print("\n[bold green]Running Test Suite[/bold green]\n")
-    
+
     test_prompts = [
-        # Coding prompts
         "Write a Python function to implement quicksort algorithm",
         "How do I create a REST API with Flask?",
         "Debug this JavaScript code that's not working",
         "Implement a binary search tree in Java",
-        
-        # Math prompts  
+
         "Solve the integral of x^2 + 3x - 5",
         "What is the derivative of sin(x) * cos(x)?",
         "Calculate the probability of getting 3 heads in 5 coin flips",
         "Find the roots of the quadratic equation 2x^2 - 7x + 3 = 0",
-        
-        # General knowledge prompts
+
         "What is the capital of Australia?",
         "Explain the water cycle",
         "What are the main causes of climate change?",
         "Who wrote the novel '1984'?",
-        
-        # Edge cases / out-of-distribution
+
         "What's the weather like today?",
         "Tell me a joke about programming",
         "How do I cook pasta?",
     ]
-    
+
     try:
         with console.status("Initializing router..."):
             router = SemanticRouter()
-        
+
         console.print(f"Testing {len(test_prompts)} prompts...\n")
-        
+
         results = []
         for i, prompt in enumerate(test_prompts, 1):
             console.print(f"[{i:2d}/{len(test_prompts)}] Testing: [italic]{prompt[:60]}...[/italic]")
-            
+
             try:
                 routing_result = router.route(prompt)
                 category = routing_result['category']
                 confidence = routing_result['confidence']
-                
+
                 console.print(f"        → [bold]{category}[/bold] (confidence: {confidence:.3f})")
-                
+
                 results.append({
                     "prompt": prompt,
                     "category": category,
                     "confidence": confidence,
                     "success": True
                 })
-                
+
             except Exception as e:
                 console.print(f"        → [red]ERROR: {e}[/red]")
                 results.append({
@@ -238,29 +233,29 @@ def test():
                     "error": str(e),
                     "success": False
                 })
-        
+
         console.print("\n" + "="*70)
         console.print("[bold green]Test Summary[/bold green]")
-        
+
         successful_tests = [r for r in results if r.get('success', False)]
         category_counts = {}
         for result in successful_tests:
             cat = result['category']
             category_counts[cat] = category_counts.get(cat, 0) + 1
-        
+
         table = Table(title="Routing Distribution")
         table.add_column("Category", style="cyan")
         table.add_column("Count", style="magenta")
         table.add_column("Percentage", style="green")
-        
+
         total = len(successful_tests)
         for category, count in category_counts.items():
             percentage = (count / total * 100) if total > 0 else 0
             table.add_row(category, str(count), f"{percentage:.1f}%")
-        
+
         console.print(table)
         console.print(f"\n✅ Successful tests: {len(successful_tests)}/{len(test_prompts)}")
-        
+
     except SemanticRouterError as e:
         console.print(f"❌ Failed to initialize router: {e}", style="bold red")
         sys.exit(1)
@@ -271,43 +266,43 @@ def stats():
 
     display_banner()
     console.print("\n[bold green]Router Statistics[/bold green]\n")
-    
+
     try:
         router = SemanticRouter()
         stats = router.get_statistics()
-        
+
         config_table = Table(title="Configuration")
         config_table.add_column("Parameter", style="cyan")
         config_table.add_column("Value", style="magenta")
-        
+
         config_table.add_row("Model", stats['model_name'])
         config_table.add_row("Database Path", stats['db_path'])
         config_table.add_row("Collection", stats['collection_name'])
         config_table.add_row("Similarity Threshold", str(stats['similarity_threshold']))
         config_table.add_row("Cache Threshold", str(stats['cache_threshold']))
         config_table.add_row("Top K Neighbors", str(stats['top_k_neighbors']))
-        
+
         console.print(config_table)
-        
+
         db_table = Table(title="Database Information")
         db_table.add_column("Metric", style="cyan")
         db_table.add_column("Value", style="magenta")
-        
+
         db_table.add_row("Total Embeddings", str(stats['total_embeddings']))
         db_table.add_row("Cache Size", str(stats['cache_size']))
-        
+
         console.print(db_table)
-        
+
         if stats.get('category_stats'):
             cat_table = Table(title="Available Categories")
             cat_table.add_column("Category", style="cyan")
             cat_table.add_column("Status", style="magenta")
-            
+
             for category, status in stats['category_stats'].items():
                 cat_table.add_row(category, status)
-            
+
             console.print(cat_table)
-        
+
     except SemanticRouterError as e:
         console.print(f"❌ Failed to get statistics: {e}", style="bold red")
         sys.exit(1)
@@ -318,30 +313,30 @@ def test_reproducibility():
 
     display_banner()
     console.print("\n[bold green]Testing Reproducibility[/bold green]\n")
-    
+
     try:
         from src.test_reproducibility import ReproducibilityTester
-        
+
         tester = ReproducibilityTester()
         results = tester.run_reproducibility_test(num_builds=2)
-        
+
         if results["reproducibility_achieved"]:
             console.print("✅ [bold green]REPRODUCIBILITY ACHIEVED[/bold green]")
             console.print("All database builds produced identical results!")
         else:
             console.print("❌ [bold red]REPRODUCIBILITY FAILED[/bold red]")
             console.print("Database builds produced different results!")
-        
+
         for comp in results["comparisons"]:
             status_color = "green" if comp["databases_identical"] else "red"
             status_text = "IDENTICAL" if comp["databases_identical"] else "DIFFERENT"
             console.print(f"  {comp['pair']}: [{status_color}]{status_text}[/{status_color}]")
-            
+
             if comp["embedding_similarity"] > 0:
                 console.print(f"    Embedding similarity: {comp['embedding_similarity']:.4f}")
-        
+
         tester.cleanup()
-        
+
     except ImportError as e:
         console.print(f"❌ Could not import test module: {e}", style="bold red")
         sys.exit(1)
@@ -364,7 +359,6 @@ def ollama_setup():
         if response.status_code == 200:
             console.print("✅ Ollama server is running!")
 
-            # Check installed models
             models = response.json().get("models", [])
             required_models = [
                 "deepseek-coder:1.3b",
@@ -429,13 +423,13 @@ def academic_eval():
     display_banner()
     console.print("\n[bold green] Academic Evaluation [/bold green]")
     console.print("Comprehensive statistical analysis \n")
-    
+
     try:
         from src.comprehensive_evaluation import ComprehensiveEvaluator
-        
+
         evaluator = ComprehensiveEvaluator()
         results = evaluator.run_comprehensive_evaluation()
-        
+
         if results:
             console.print("\n[bold green]✅ Academic evaluation completed successfully![/bold green]")
             console.print("📁 Results saved to 'evaluation_results/' directory")
@@ -443,7 +437,7 @@ def academic_eval():
             console.print("📝 Report created")
         else:
             console.print("\n[bold red]❌ Academic evaluation failed[/bold red]")
-            
+
     except ImportError as e:
         console.print(f"❌ Missing dependencies: {e}")
         console.print("Install with: [cyan]pip install -r requirements.txt[/cyan]")
@@ -456,14 +450,14 @@ def visualize_embeddings():
 
     display_banner()
     console.print("\n[bold green] Embedding Visualization [/bold green]")
-    
+
     try:
         from src.embedding_visualization import EmbeddingVisualizer
-        
+
         visualizer = EmbeddingVisualizer()
         visualizer.initialize_components()
         output_dir = visualizer.create_comprehensive_visualizations()
-        
+
         if output_dir:
             console.print(f"\n[bold green]✅ Visualization  completed![/bold green]")
             console.print(f"📁 All visualizations saved to '{output_dir}/' directory")
@@ -471,7 +465,7 @@ def visualize_embeddings():
             console.print("🌐 3D visualizations created")
         else:
             console.print("\n[bold red]❌ Visualization generation failed[/bold red]")
-            
+
     except ImportError as e:
         console.print(f"❌ Missing dependencies: {e}")
         console.print("Install with: [cyan]pip install -r requirements.txt[/cyan]")
@@ -484,7 +478,7 @@ def full_analysis():
 
     display_banner()
     console.print("\n[bold green] Complete Analysis [/bold green]")
-    
+
     console.print("[bold cyan]Step 1: Running comprehensive evaluation...[/bold cyan]")
     try:
         from src.comprehensive_evaluation import ComprehensiveEvaluator
@@ -494,7 +488,7 @@ def full_analysis():
     except Exception as e:
         console.print(f"❌ Evaluation failed: {e}")
         return
-    
+
     console.print("\n[bold cyan]Step 2: Generating embedding visualizations...[/bold cyan]")
     try:
         from src.embedding_visualization import EmbeddingVisualizer
@@ -505,7 +499,7 @@ def full_analysis():
     except Exception as e:
         console.print(f"❌ Visualization failed: {e}")
         return
-    
+
     console.print("\n[bold cyan]Step 3: Running RouterBench evaluation...[/bold cyan]")
     try:
         from src.comprehensive_routerbench import ComprehensiveRouterBench
@@ -542,15 +536,15 @@ def _show_ollama_installation_instructions():
    [cyan]ollama serve[/cyan]
 
 [bold]3. Pull Required Models (~4GB total):[/bold]
-   [cyan]ollama pull deepseek-coder:1.3b[/cyan]    # Coding specialist
-   [cyan]ollama pull qwen2-math:1.5b[/cyan]        # Math specialist  
-   [cyan]ollama pull llama3.2:1b[/cyan]           # General knowledge
-   [cyan]ollama pull phi3:mini[/cyan]             # Fast fallback
+   [cyan]ollama pull deepseek-coder:1.3b[/cyan]
+   [cyan]ollama pull qwen2-math:1.5b[/cyan]
+   [cyan]ollama pull llama3.2:1b[/cyan]
+   [cyan]ollama pull phi3:mini[/cyan]
 
 [bold]4. Verify Setup:[/bold]
    [cyan]python main.py ollama-setup[/cyan]
 
-[bold red]🎯 Demo Impact:[/bold red] 
+[bold red]🎯 Demo Impact:[/bold red]
 Real AI responses vs mock text = 10x more impressive for your professor!
 """
     console.print(Panel(instructions, title="🚀 Setup Instructions"))
@@ -564,23 +558,21 @@ def routerbench():
     display_banner()
     console.print("\n[bold green]🎯 RouterBench Evaluation[/bold green]")
     console.print("Following exact RouterBench methodology from Martian AI (arXiv:2403.12031)\n")
-    
+
     try:
         from src.comprehensive_routerbench import ComprehensiveRouterBench
-        
-        # Initialize
+
         router = SemanticRouter()
         evaluator = ComprehensiveRouterBench(router)
-        
+
         console.print("[bold cyan]Running RouterBench evaluation with 1,000 queries...[/bold cyan]")
-        
-        # Run evaluation
+
         result = evaluator.run_comprehensive_evaluation(dataset_size=1000)
-        
+
         console.print(f"\n[bold green]🎉 RouterBench Evaluation Complete![/bold green]")
         console.print("=" * 60)
         console.print(f"📊 AIQ Score: [bold cyan]{result.aiq_score:.4f}[/bold cyan]")
-        
+
         if result.aiq_score >= 0.8:
             console.print("🟢 Performance: [bold green]Excellent[/bold green] (State-of-the-art)")
         elif result.aiq_score >= 0.6:
@@ -589,15 +581,15 @@ def routerbench():
             console.print("🟠 Performance: [bold orange]Fair[/bold orange] (Needs optimization)")
         else:
             console.print("🔴 Performance: [bold red]Poor[/bold red] (Requires improvement)")
-        
+
         console.print(f"💰 Total Cost: [bold cyan]${result.detailed_metrics['total_cost']:.4f}[/bold cyan]")
         console.print(f"⚡ Average Latency: [bold cyan]{result.detailed_metrics['average_latency_ms']:.1f}ms[/bold cyan]")
         console.print(f"🎯 Average Quality: [bold cyan]{result.detailed_metrics['average_quality']:.3f}[/bold cyan]")
-        
+
         console.print(f"\n📁 Results: [cyan]comprehensive_routerbench_results/[/cyan]")
         console.print(f"📄 Report: [cyan]comprehensive_routerbench_report.md[/cyan]")
         console.print(f"📊 Visualizations: [cyan]comprehensive_routerbench_analysis.png[/cyan]")
-        
+
     except Exception as e:
         console.print(f"❌ RouterBench evaluation failed: {e}")
 
@@ -609,7 +601,7 @@ def setup():
     """
     display_banner()
     console.print("\n[bold green]SS-GER Setup Instructions[/bold green]\n")
-    
+
     setup_text = f"""
 [bold]1. Build the Expertise Database (Required)[/bold]
    Run this command first to create the expertise manifolds:
@@ -617,7 +609,7 @@ def setup():
 
 [bold]2. Configure API Keys (Optional for testing)[/bold]
    Create a .env file with your API keys:
-   
+
 {config.get_example_env_content()}
 
 [bold]3. Install Dependencies[/bold]
@@ -631,17 +623,15 @@ def setup():
 [bold]5. Start Using SS-GER[/bold]
    Route individual prompts:
    [cyan]python main.py "Write a Python function for sorting"[/cyan]
-   
+
    Or start interactive mode:
    [cyan]python main.py --interactive[/cyan]
 """
-    
+
     console.print(Panel(setup_text, title="🚀 Setup Guide"))
-    
-    # Check current status
+
     console.print("\n[bold blue]Current Status Check[/bold blue]\n")
-    
-    # Check if database exists
+
     import os
     if os.path.exists(config.CHROMADB_PATH):
         console.print("✅ Expertise database found")
@@ -653,13 +643,12 @@ def setup():
             console.print("⚠️ Database exists but may be corrupted")
     else:
         console.print("❌ Expertise database not found - run build_expertise_db.py first")
-    
-    # Check API keys
+
     if config.OPENAI_API_KEY:
         console.print("✅ OpenAI API key configured")
     else:
         console.print("⚠️ OpenAI API key not configured (will use mock responses)")
-    
+
     if config.DEEPSEEK_API_KEY:
         console.print("✅ DeepSeek API key configured")
     else:
@@ -673,46 +662,43 @@ def gpu_status():
     """
     display_banner()
     console.print("\n[bold green]🎮 SS-GER GPU Status[/bold green]\n")
-    
+
     try:
         from src.gpu_monitor import get_gpu_monitor
-        
+
         gpu_monitor = get_gpu_monitor()
-        
-        # Display detection results
+
         detection = gpu_monitor.detection_results
-        
+
         console.print("[bold cyan]GPU Detection Results:[/bold cyan]")
         detection_table = Table(title="Available GPU Libraries")
         detection_table.add_column("Library", style="cyan")
-        detection_table.add_column("Status", style="magenta") 
-        
+        detection_table.add_column("Status", style="magenta")
+
         detection_table.add_row("GPUtil", "✅ Available" if detection["gputil_available"] else "❌ Not Available")
         detection_table.add_row("NVML", "✅ Available" if detection["nvml_available"] else "❌ Not Available")
         detection_table.add_row("PyNVML", "✅ Available" if detection["pynvml_available"] else "❌ Not Available")
         detection_table.add_row("nvidia-smi", "✅ Available" if detection["nvidia_smi_available"] else "❌ Not Available")
-        
+
         console.print(detection_table)
-        
+
         console.print(f"\n[bold]GPU Count:[/bold] {detection['gpu_count']}")
-        
+
         if detection["gpu_names"]:
             console.print("\n[bold cyan]Available GPUs:[/bold cyan]")
             for i, name in enumerate(detection["gpu_names"]):
                 console.print(f"  GPU {i}: {name}")
-        
-        # Display current metrics
+
         console.print("\n" + "="*60)
         gpu_monitor.print_current_status()
-        
-        # Display system info if available
+
         if "system_info" in detection and detection["system_info"]:
             sys_info = detection["system_info"]
             console.print("[bold cyan]System Information:[/bold cyan]")
             console.print(f"  CPU Cores: {sys_info.get('cpu_count', 'Unknown')}")
             console.print(f"  Memory: {sys_info.get('memory_total_gb', 0):.1f} GB")
             console.print(f"  Platform: {sys_info.get('platform', 'Unknown')}")
-        
+
     except ImportError as e:
         console.print(f"❌ GPU monitoring dependencies not installed: {e}")
         console.print("Install with: [cyan]pip install -r requirements.txt[/cyan]")
@@ -730,23 +716,22 @@ def gpu_monitor(
     """
     display_banner()
     console.print(f"\n[bold green]🔍 GPU Monitoring ({duration}s)[/bold green]\n")
-    
+
     try:
         from src.gpu_monitor import get_gpu_monitor
-        
+
         gpu_monitor = get_gpu_monitor()
         gpu_monitor.sample_interval = interval
-        
+
         if gpu_monitor.detection_results["gpu_count"] == 0:
             console.print("❌ No GPUs detected for monitoring")
             return
-        
-        # Start monitoring
+
         gpu_monitor.start_monitoring()
-        
+
         console.print(f"📊 Monitoring {gpu_monitor.detection_results['gpu_count']} GPU(s) for {duration} seconds...")
         console.print("Press Ctrl+C to stop early\n")
-        
+
         try:
             with Progress(
                 SpinnerColumn(),
@@ -754,29 +739,26 @@ def gpu_monitor(
                 console=console
             ) as progress:
                 task = progress.add_task("Monitoring GPUs...", total=duration)
-                
+
                 for i in range(duration):
                     progress.update(task, advance=1)
                     time.sleep(1)
-                    
-                    # Show current status every 10 seconds
+
                     if i > 0 and i % 10 == 0:
                         current_metrics = gpu_monitor.get_current_metrics()
                         if current_metrics:
                             for metric in current_metrics:
                                 progress.console.print(f"GPU {metric.gpu_id}: {metric.utilization_percent:.1f}% util, {metric.memory_percent:.1f}% mem, {metric.temperature_c:.1f}°C")
-        
+
         except KeyboardInterrupt:
             console.print("\n⏹️ Monitoring stopped by user")
-        
-        # Stop monitoring and show results
+
         gpu_monitor.stop_monitoring()
-        
-        # Display summary
+
         summary = gpu_monitor.get_summary_stats()
         if "error" not in summary:
             console.print("\n[bold green]📊 Monitoring Summary[/bold green]")
-            
+
             for gpu_key, stats in summary.items():
                 if gpu_key.startswith("gpu_"):
                     console.print(f"\n[bold]{stats['name']}[/bold]")
@@ -785,16 +767,178 @@ def gpu_monitor(
                     console.print(f"  Temperature: {stats['temperature']['avg']:.1f}°C avg (max: {stats['temperature']['max']:.1f}°C)")
                     if 'power' in stats:
                         console.print(f"  Power: {stats['power']['avg']:.1f}W avg (max: {stats['power']['max']:.1f}W)")
-        
-        # Save results
+
         filename = gpu_monitor.save_monitoring_data()
         console.print(f"\n💾 Monitoring data saved: {filename}")
-        
+
     except ImportError as e:
         console.print(f"❌ GPU monitoring dependencies not installed: {e}")
         console.print("Install with: [cyan]pip install -r requirements.txt[/cyan]")
     except Exception as e:
         console.print(f"❌ GPU monitoring error: {e}")
+
+
+@app.command()
+def error_analysis():
+    """
+    Run comprehensive error analysis on evaluation results
+    """
+    display_banner()
+    console.print("\n[bold green]🔍 Error Analysis[/bold green]")
+    console.print("Analyzing failure patterns and misclassifications\n")
+
+    try:
+        from src.error_analysis import ErrorAnalyzer
+        from src.comprehensive_evaluation import ComprehensiveEvaluator
+
+        console.print("Running comprehensive evaluation to get fresh data...")
+        evaluator = ComprehensiveEvaluator()
+        results = evaluator.run_comprehensive_evaluation()
+
+        if results:
+            console.print("\n[bold cyan]Running error analysis...[/bold cyan]")
+            analyzer = ErrorAnalyzer()
+            error_results = analyzer.run_complete_analysis(results)
+
+            console.print("\n[bold green]✅ Error analysis completed![/bold green]")
+            console.print("📁 Results: evaluation_results/error_analysis/")
+        else:
+            console.print("❌ Failed to get evaluation results")
+
+    except ImportError as e:
+        console.print(f"❌ Missing dependencies: {e}")
+        console.print("Install with: [cyan]pip install -r requirements.txt[/cyan]")
+    except Exception as e:
+        console.print(f"❌ Error analysis failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+@app.command()
+def cost_benefit():
+    """
+    Run cost-benefit analysis comparing accuracy vs latency trade-offs
+    """
+    display_banner()
+    console.print("\n[bold green]💰 Cost-Benefit Analysis[/bold green]")
+    console.print("Analyzing accuracy-latency trade-offs and use case recommendations\n")
+
+    try:
+        from src.cost_benefit_analysis import CostBenefitAnalyzer
+        from src.comprehensive_evaluation import ComprehensiveEvaluator
+
+        console.print("Running comprehensive evaluation to get fresh data...")
+        evaluator = ComprehensiveEvaluator()
+        results = evaluator.run_comprehensive_evaluation()
+
+        if results:
+            console.print("\n[bold cyan]Running cost-benefit analysis...[/bold cyan]")
+            analyzer = CostBenefitAnalyzer()
+            cb_results = analyzer.run_complete_analysis(results)
+
+            console.print("\n[bold green]✅ Cost-benefit analysis completed![/bold green]")
+            console.print("📁 Results: evaluation_results/cost_benefit_analysis/")
+        else:
+            console.print("❌ Failed to get evaluation results")
+
+    except ImportError as e:
+        console.print(f"❌ Missing dependencies: {e}")
+        console.print("Install with: [cyan]pip install -r requirements.txt[/cyan]")
+    except Exception as e:
+        console.print(f"❌ Cost-benefit analysis failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+@app.command()
+def ablation():
+    """
+    Run ablation study to analyze impact of hyperparameters
+    """
+    display_banner()
+    console.print("\n[bold green]🔬 Ablation Study[/bold green]")
+    console.print("Testing impact of K neighbors, similarity threshold, cache size, and dataset size\n")
+
+    try:
+        from src.ablation_study import AblationStudy
+
+        console.print("[bold cyan]Starting ablation study (this may take several minutes)...[/bold cyan]")
+        study = AblationStudy()
+        results = study.run_complete_study()
+
+        if results:
+            console.print("\n[bold green]✅ Ablation study completed![/bold green]")
+            console.print("📁 Results: evaluation_results/ablation_study/")
+            console.print("📊 Visualizations and report generated")
+        else:
+            console.print("❌ Ablation study failed")
+
+    except ImportError as e:
+        console.print(f"❌ Missing dependencies: {e}")
+        console.print("Install with: [cyan]pip install -r requirements.txt[/cyan]")
+    except Exception as e:
+        console.print(f"❌ Ablation study failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+@app.command()
+def complete_analysis():
+    """
+    Run all analysis modules: evaluation, error analysis, cost-benefit, and ablation study
+    """
+    display_banner()
+    console.print("\n[bold green]🎯 Complete Analysis Suite[/bold green]")
+    console.print("Running all analysis modules (this will take some time)...\n")
+
+    try:
+        console.print("[bold cyan]Step 1/4: Running comprehensive evaluation...[/bold cyan]")
+        from src.comprehensive_evaluation import ComprehensiveEvaluator
+        evaluator = ComprehensiveEvaluator()
+        eval_results = evaluator.run_comprehensive_evaluation()
+
+        if not eval_results:
+            console.print("❌ Evaluation failed, stopping analysis")
+            return
+
+        console.print("✅ Evaluation complete\n")
+
+        console.print("[bold cyan]Step 2/4: Running error analysis...[/bold cyan]")
+        from src.error_analysis import ErrorAnalyzer
+        error_analyzer = ErrorAnalyzer()
+        error_results = error_analyzer.run_complete_analysis(eval_results)
+        console.print("✅ Error analysis complete\n")
+
+        console.print("[bold cyan]Step 3/4: Running cost-benefit analysis...[/bold cyan]")
+        from src.cost_benefit_analysis import CostBenefitAnalyzer
+        cb_analyzer = CostBenefitAnalyzer()
+        cb_results = cb_analyzer.run_complete_analysis(eval_results)
+        console.print("✅ Cost-benefit analysis complete\n")
+
+        console.print("[bold cyan]Step 4/4: Running ablation study...[/bold cyan]")
+        from src.ablation_study import AblationStudy
+        ablation = AblationStudy()
+        ablation_results = ablation.run_complete_study()
+        console.print("✅ Ablation study complete\n")
+
+        console.print("\n" + "="*60)
+        console.print("[bold green]🎉 Complete Analysis Suite Finished![/bold green]")
+        console.print("="*60)
+        console.print("\n📁 All results saved to 'evaluation_results/' directory:")
+        console.print("  • evaluation_results/ - Main evaluation metrics")
+        console.print("  • evaluation_results/error_analysis/ - Failure patterns")
+        console.print("  • evaluation_results/cost_benefit_analysis/ - Trade-off analysis")
+        console.print("  • evaluation_results/ablation_study/ - Parameter sensitivity")
+        console.print("\n📊 Generated visualizations and reports in each subdirectory")
+        console.print("\n🎓 Your project is now ready for comprehensive academic evaluation!")
+
+    except ImportError as e:
+        console.print(f"❌ Missing dependencies: {e}")
+        console.print("Install with: [cyan]pip install -r requirements.txt[/cyan]")
+    except Exception as e:
+        console.print(f"❌ Complete analysis failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 
 @app.command()
@@ -804,53 +948,46 @@ def gpu_profile():
     """
     display_banner()
     console.print("\n[bold green]🎯 GPU Routing Profiler[/bold green]\n")
-    
+
     try:
         from src.gpu_monitor import get_gpu_monitor, RoutingGPUProfiler
-        
+
         gpu_monitor = get_gpu_monitor()
         profiler = RoutingGPUProfiler(gpu_monitor)
-        
+
         if gpu_monitor.detection_results["gpu_count"] == 0:
             console.print("❌ No GPUs detected for profiling")
             return
-        
-        # Test prompts for profiling
+
         test_prompts = [
             "Write a Python function to implement quicksort algorithm",
-            "Solve the integral of x^2 + 3x - 5 from 0 to 2", 
+            "Solve the integral of x^2 + 3x - 5 from 0 to 2",
             "What is the capital of Australia?",
             "Create a REST API endpoint using FastAPI",
             "Find the derivative of sin(x) * cos(x)"
         ]
-        
+
         console.print("🚀 Starting GPU profiling with test routing operations...")
-        
-        # Initialize router
+
         router = SemanticRouter()
-        
-        # Start profiling session
+
         profiler.start_routing_session("test_routing_profile")
-        
+
         console.print(f"📊 Processing {len(test_prompts)} test prompts with GPU monitoring...")
-        
+
         for i, prompt in enumerate(test_prompts, 1):
             console.print(f"[{i}/{len(test_prompts)}] Routing: [italic]{prompt[:50]}...[/italic]")
-            
-            # Route the prompt (this will use GPU for Ollama models)
+
             routing_result = router.route(prompt)
-            
-            # Brief delay to capture GPU usage
+
             time.sleep(0.5)
-        
-        # End profiling session
+
         session_result = profiler.end_routing_session()
-        
+
         if session_result:
             console.print("\n[bold green]🎯 Profiling Results[/bold green]")
             console.print(f"Session Duration: {session_result['duration']:.2f} seconds")
-            
-            # Display GPU statistics during profiling
+
             summary = session_result.get('summary_stats', {})
             if "error" not in summary:
                 for gpu_key, stats in summary.items():
@@ -863,9 +1000,9 @@ def gpu_profile():
                         console.print(f"  Average Temperature: {stats['temperature']['avg']:.1f}°C")
                         if 'power' in stats:
                             console.print(f"  Average Power: {stats['power']['avg']:.1f}W")
-        
+
         console.print("\n💡 Use this data to optimize your local model performance!")
-        
+
     except ImportError as e:
         console.print(f"❌ GPU monitoring dependencies not installed: {e}")
         console.print("Install with: [cyan]pip install -r requirements.txt[/cyan]")
