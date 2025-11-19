@@ -371,31 +371,9 @@ We compare against 9 baseline approaches:
 - [ ] Real-time learning from user feedback
 - [ ] GPU acceleration for batch processing
 
-## 🤝 Contributing
-
-Contributions welcome! Please:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
 ## 🙏 Acknowledgments
 
 - **Sentence Transformers** - For the excellent embedding models
 - **ChromaDB** - For the fast vector database
 - **CatBoost** - For the high-performance gradient boosting
 - **Hugging Face** - For dataset hosting and model hub
-
-## 📧 Contact
-
-For questions or feedback, please open an issue on GitHub.
-
----
-
-**Built with ❤️ for intelligent query routing**
