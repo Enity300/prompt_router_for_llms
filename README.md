@@ -365,15 +365,8 @@ We compare against 9 baseline approaches:
 
 ### Future Improvements
 - [ ] Add supervised fine-tuning layer
-- [ ] Support dynamic category addition
+- [ ] Support dynamic category addition          
 - [ ] Multi-language support
 - [ ] Hybrid approach (vector DB + classifier)
 - [ ] Real-time learning from user feedback
 - [ ] GPU acceleration for batch processing
-
-## 🙏 Acknowledgments
-
-- **Sentence Transformers** - For the excellent embedding models
-- **ChromaDB** - For the fast vector database
-- **CatBoost** - For the high-performance gradient boosting
-- **Hugging Face** - For dataset hosting and model hub
