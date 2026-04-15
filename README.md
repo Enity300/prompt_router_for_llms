@@ -92,7 +92,7 @@ pip
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/yourusername/semantic-router.git
+git clone https://github.com/Enity300/semantic-router.git
 cd semantic-router
 ```
 
